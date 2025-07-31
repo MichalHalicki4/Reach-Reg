@@ -1,0 +1,16 @@
+data/gauge_at_Danube.pkl
+data/gauge_at_Elbe.pkl
+data/gauge_at_Oder.pkl
+data/gauge_at_Rhine.pkl
+data/gauge_at_Wisła.pkl
+data/imgw_h_2024_09_to_2024_12.csv
+scripts/imgw_h_all_gauges_2022_to_2025_04.csv
+
+# Ogólne reguły Pythona (dobrze jest je zawsze mieć)
+*.pyc
+__pycache__/
+.ipynb_checkpoints/
+.DS_Store # dla macOS
+*.log
+venv/
+.idea/ # PyCharm
