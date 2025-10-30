@@ -166,15 +166,17 @@ if download_gauge_data_for_river:
     gage_height_param = "00065" # Kod dla Gage Height (stan wody)
     start_date = "2023-07-01"
     end_date = "2025-06-01"
-    river_name = "Red River"
-    red_river_states = ["TX", "OK", "AR", "LA"]
+    river_name = "Missouri River"
+    msspi_river_states = ["AL", "IL", "MS", "MO"]
+    mssri_river_states = ['SD', 'IA', 'NE', 'MO', 'KS']
+    # red_river_states = ["TX", "OK", "AR", "LA"]
     # Wywołanie funkcji
     stations_on_river = get_river_gage_stations_with_data(
         river_name= river_name,
         parameter_code=gage_height_param,
         start_date=start_date,
         end_date=end_date,
-        state_codes=red_river_states,
+        state_codes=mssri_river_states,
         has_data_in_date_range=True
     )
     stations_on_river.to_csv(f'/Users/michalhalicki/Documents/nauka/dane_gis/dane_USGS/{river_name}_gauge_metadata.csv')
@@ -199,7 +201,7 @@ if download_gauge_data_for_river:
         df = df_gage_height.loc[
             (df_gage_height[col3] == 'P') | (df_gage_height[col3] == 'A')]
         df = df[[col1, col2]].rename(columns={col1: 'id', col2: 'stage'})
-        df = df.resample('D').agg(aggregation_rules).reset_index().dropna()
+        df = df.resample('H').agg(aggregation_rules).reset_index().dropna()
         df['stage'] = round(df['stage'] * 0.3048, 2)
         df = df.rename(columns={'datetime':'date'})
 
@@ -215,7 +217,7 @@ if download_gauge_data_for_river:
 
 plot_all_gauges = True
 if plot_all_gauges:
-    river_name = "Red River"
+    # river_name = "Red River"
     output_path = f'/Users/michalhalicki/Documents/nauka/dane_gis/dane_USGS/{river_name}_gauge_data.csv'
     df_res = pd.read_csv(output_path, sep=';')
     fig, ax = plt.subplots()

@@ -194,7 +194,7 @@
 #     # ax2.set_xlim(minx - buffer, maxx + buffer)
 #     # ax2.set_ylim(miny - buffer, maxy + buffer)
 #     #
-#     # plt.show()
+#     # plt.show(block=True)
 #
 #     args = {'api_key': '59B654E28B331DF19DFD0E252F4627EB723A281AC163AC648A82C841636131D6', 'format': 'json'}
 #     url = "https://dahiti.dgfi.tum.de/api/v2/download-water-level/"
@@ -353,7 +353,7 @@
 #             # ax.scatter(reference_station_data['shifted_time'], reference_station_data['shifted_wl'], marker='d', s=50,
 #             #            color='red', label='water level from reference station', zorder=11)
 #             # ax.legend()
-#             # plt.show()
+#             # plt.show(block=True)
 #
 #             imgw_coords = pd.read_csv(f'{data_dir}imgw_coords.csv', sep=',')
 #             imgw_gdf = gpd.GeoDataFrame(imgw_coords, geometry=[Point(xy) for xy in zip(imgw_coords['X'], imgw_coords['Y'])],
@@ -527,7 +527,7 @@
 #     # ax2.set_ylabel('NSE')
 #     # ax2.legend()
 #     # fig.tight_layout()
-#     # plt.show()
+#     # plt.show(block=True)
 #         # plt.savefig(f'{figs_dir}{target_id}_buffer_accuracies.png')
 #
 #     targets_df = pd.DataFrame(stations_acc, columns=['target', 'speed', 'rmse', 'nse'])
@@ -547,7 +547,7 @@
 #     ax2.set_ylabel('NSE')
 #     ax2.legend()
 #     fig.tight_layout()
-#     plt.show()
+#     plt.show(block=True)
 #
 #
 #
@@ -624,16 +624,54 @@ import copy
 
 data_dir = '/Users/michalhalicki/Documents/nauka/projekty/NAWA_BEKKER/Bekker_Python/data/'
 t1, t2 = pd.to_datetime('2023-07-11 00:00'), pd.to_datetime('2024-12-31 23:59')
-velocity, buffer = 30 / 36, 100
-riv, metric_crs = 'Rhine', '4839'
+velocity, buffer = 40 / 36, 150
+# riv, metric_crs = 'Rhine', '4839'
 # riv, metric_crs = 'Wisla', '2180'
-# riv, metric_crs = 'Odra', '2180'
+riv, metric_crs = 'Odra', '2180'
 # riv, metric_crs = 'Elbe', '4839'
 # riv, metric_crs = 'Danube', '3035'
+riv, metric_crs = 'Po', '3035'
 river_name, riv_names, basin_name, up_reach, dn_reach, country = rv.dahiti_river_names_and_basins[riv].values()
-riv_path = '/Users/michalhalicki/Documents/nauka/dane_gis/SWORD_v17b_shp/EU/eu_sword_reaches_hb24_v17b.shp'  # POLAND
+# riv_path = '/Users/michalhalicki/Documents/nauka/dane_gis/SWORD_v17b_shp/EU/eu_sword_reaches_hb24_v17b.shp'  # POLAND
 # riv_path = '/Users/michalhalicki/Documents/nauka/dane_gis/SWORD_v17b_shp/EU/eu_sword_reaches_hb23_v17b.shp'  # ELBE, RHINE
 # riv_path = '/Users/michalhalicki/Documents/nauka/dane_gis/SWORD_v17b_shp/EU/eu_sword_reaches_hb22_v17b.shp'  # DANUBE
+riv_path = '/Users/michalhalicki/Documents/nauka/dane_gis/SWORD_v17b_shp/EU/eu_sword_reaches_hb21_v17b.shp'  # ITALY
+
+
+def plot_regressions_btwn_stations(vs_id_cofl, vs_id_main, res_str):
+    from sklearn.linear_model import LinearRegression
+    from sklearn.metrics import r2_score
+    dahiti = DAHITI()
+    VS_cofl = sc.VirtualStation(vs_id_cofl)
+    VS_cofl.get_water_levels(dahiti)
+    VS_cofl.time_filter(t1, t2)
+
+    VS_main = sc.VirtualStation(vs_id_main)
+    VS_main.get_water_levels(dahiti)
+    VS_main.time_filter(t1, t2)
+
+    vs_cofl_set = set(pd.to_datetime(VS_cofl.wl['datetime']).dt.round(res_str))
+    vs_main_set = set(pd.to_datetime(VS_main.wl['datetime']).dt.round(res_str))
+    common_indices = vs_cofl_set.intersection(vs_main_set)
+    vs_cofl_swot_ts = VS_cofl.wl.set_index(pd.to_datetime(VS_cofl.wl['datetime']).dt.round(res_str))['wse'].loc[
+        list(common_indices)]
+    vs_main_swot_ts = VS_main.wl.set_index(pd.to_datetime(VS_main.wl['datetime']).dt.round(res_str))['wse'].loc[
+        list(common_indices)]
+    regr_df = pd.DataFrame(index=list(common_indices))
+    regr_df['vs_cofl_wse'] = vs_cofl_swot_ts
+    regr_df['vs_main_wse'] = vs_main_swot_ts
+    print(regr_df)
+    linr_model = LinearRegression().fit(regr_df[['vs_cofl_wse']], regr_df[['vs_main_wse']])
+    r_squared = r2_score(y_true=regr_df[['vs_main_wse']], y_pred=linr_model.predict(regr_df[['vs_cofl_wse']]))
+    a, b, r2, len_common = round(linr_model.coef_[0][0], 3), round(linr_model.intercept_[0], 3), round(r_squared,
+                                                                                                       3), len(
+        common_indices)
+    fig, ax = plt.subplots()
+    ax.scatter(regr_df['vs_cofl_wse'], regr_df['vs_main_wse'])
+    ax.plot(regr_df['vs_cofl_wse'], linr_model.predict(regr_df['vs_cofl_wse'].values.reshape(-1, 1)))
+    ax.set_title(f'VS {vs_id_cofl} vs {vs_id_main}: y = {a}x + {b}, r2 = {r2}')
+    plt.show(block=True)
+
 
 save_river_to_file = False
 if save_river_to_file:
@@ -645,7 +683,7 @@ else:
     with open(f'{data_dir}{river_name.split(",")[0]}_object.pkl', "rb") as f:
         current_river = pickle.load(f)
 
-download_dahiti_insitu_data = False
+download_dahiti_insitu_data = True
 if download_dahiti_insitu_data:
     insitu = InSitu()
     stations_data = sc.get_list_of_stations_from_country(country, insitu)
@@ -669,7 +707,7 @@ if download_dahiti_insitu_data:
         pickle.dump(gauges_on_river_dict, f)
     print(1)
 
-download_and_juxtapose_dahiti_and_gauge_oop = False
+download_and_juxtapose_dahiti_and_gauge_oop = True
 if download_and_juxtapose_dahiti_and_gauge_oop:
     dahiti = DAHITI()
     data = dahiti.list_targets(args={'basin': basin_name})
@@ -690,9 +728,13 @@ if download_and_juxtapose_dahiti_and_gauge_oop:
         VS.time_filter(t1, t2)
         VS.upload_chainage(current_river.get_chainage_of_point(VS.x, VS.y))
         VS.find_closest_gauge_and_chain(loaded_gauges)
-        if VS.neigh_g_up:
+        if VS.neigh_g_up and VS.neigh_g_dn:
             VS.get_juxtaposed_vs_and_gauge_meas(loaded_gauges[VS.neigh_g_up].wl_df, loaded_gauges[VS.neigh_g_dn].wl_df, loaded_gauges[VS.neigh_g_dn].sampling, velocity)
-            vs_objects.append(VS)
+        elif VS.neigh_g_up:
+            VS.get_juxtaposed_vs_and_gauge_meas(loaded_gauges[VS.neigh_g_up].wl_df, None, loaded_gauges[VS.neigh_g_up].sampling, velocity)
+        else:
+            VS.get_juxtaposed_vs_and_gauge_meas(None, loaded_gauges[VS.neigh_g_dn].wl_df, loaded_gauges[VS.neigh_g_dn].sampling, velocity)
+        vs_objects.append(VS)
 
     with open(f'{data_dir}vs_at_{river_name.split(",")[0]}.pkl', "wb") as f:
         pickle.dump(vs_objects, f)
@@ -744,14 +786,15 @@ if densify_wl_dahiti:
                                'NORMALIZED')
         print('______________________________')
 
-    analyse_accuracies = True
+    analyse_accuracies = False
     if analyse_accuracies:
         velocity, buffer = 30/36, 150
         accuracies = []
+        new_accs = []
         corr_thres, amp_thres = 0.8, 1
         itpd_method, norm_method = 'akima', 'standard'
-        gauge_dist_thres = 20
-        # tributary_chains = current_river.tributary_chains[:-1]
+        gauge_dist_thres = 5
+        # tributary_chains = current_river.tributary_chains
         tributary_chains = []
         neigh_dam_vs = rv.vs_with_neight_dams[riv]
         res_cols_all_vs = ['id', 'chain', 'velocity', 'data_len', 'vs_len', 'mean_bias', 'mean_uncrt',
@@ -759,8 +802,10 @@ if densify_wl_dahiti:
                     'rmse_ss', 'rmse_sn', 'rmse_sr', 'nse_c', 'nse_s', 'nse_n', 'nse_r', 'nse_sc', 'nse_ss',
                     'nse_sn', 'nse_sr', 'x', 'y']
         res_cols_swot = ['id', 'chain', 'velocity', 'data_len', 'vs_len', 'swot_mean_bias', 'swot_mean_uncrt',
-                         'rmse_sc', 'rmse_ss', 'rmse_sn', 'rmse_srg', 'rmse_sr', 'nse_sc', 'nse_ss', 'nse_sn',
+                         'rmse_sc', 'rmse_sn', 'rmse_srg', 'rmse_sr', 'nse_sc', 'nse_sn',
                          'nse_srg', 'nse_sr', 'x', 'y']
+        new_accs_cols = ['id', 'chain', 'velocity', 'rmse_sc', 'rmse_sn', 'rmse_srg', 'rmse_srgo', 'rmse_sr', 'rmse_srgd', 'rmse_srd',
+                         'nse_sc', 'nse_sn', 'nse_srg', 'nse_srgo', 'nse_sr', 'nse_srgd', 'nse_srd', 'x', 'y']
         # t1, t2 = pd.to_datetime('2023-07-11'), pd.to_datetime('2025-05-01')
         for vs_id in [x.id for x in loaded_stations]:
         # chainage_limit = [x for x in loaded_stations if x.id == 15352][0].chainage  # WISŁA > WŁOCŁAWKA
@@ -795,9 +840,9 @@ if densify_wl_dahiti:
                 DS.normalized_ts_daily = DS.get_dist_weighted_wl(DS.normalized_ts)
                 DS.normalized_ts_itpd = DS.interpolate(DS.normalized_ts_daily)
 
-                DS.get_spline_interpolated_ts(DS.dist_weighted_daily_wl, 'wl_weighted', 5)
+                # DS.get_spline_interpolated_ts(DS.dist_weighted_daily_wl, 'wl_weighted', 5)
                 rmse_c, nse_c = DS.get_rmse_nse_values(DS.interpolated_wl, DS.interpolated_wl.index.min(), DS.interpolated_wl.index.max(), 'CLASSIC METHOD:')
-                rmse_s, nse_s = DS.get_rmse_nse_values(DS.spline_itpd_wl, DS.spline_itpd_wl.index.min(), DS.spline_itpd_wl.index.max(), 'SPLINE AND DIST WEIGHT:')
+                # rmse_s, nse_s = DS.get_rmse_nse_values(DS.spline_itpd_wl, DS.spline_itpd_wl.index.min(), DS.spline_itpd_wl.index.max(), 'SPLINE AND DIST WEIGHT:')
                 rmse_n, nse_n = DS.get_rmse_nse_values(DS.normalized_ts_itpd, DS.normalized_ts_itpd.index.min(), DS.normalized_ts_itpd.index.max(), 'NORMALIZED')
                 rmse_r, nse_r = DS.get_rmse_nse_values(DS.single_VS_itpd, DS.single_VS_itpd.index.min(), DS.single_VS_itpd.index.max(), 'RAW INTERPOLATION')
                 mean_bias, mean_uncrt = DS.densified_wl['bias'].mean(), DS.densified_wl['uncertainty'].mean()
@@ -805,9 +850,8 @@ if densify_wl_dahiti:
             """ SWOT: """
             DS = sc.DensificationStation(VS)
             DS.get_upstream_adjacent_vs(loaded_stations, buffer)
-            DS.filter_upstream_stations_by_correlation(corr_thres, True)
-            DS.filter_upstream_stations_by_wl_amplitude(amp_thres)
-            DS.filter_upstream_stations_by_dams_and_tributaries(current_river.dams, tributary_chains)
+            DS.filter_stations_by_corr_amp_dams_tribs_other(corr_thres, amp_thres, current_river.dams, tributary_chains,
+                                                            rv.vs_with_neight_dams[riv], False)
             if len(DS.upstream_adjacent_vs) == 0:
                     print(f'NO UPSTREAM VS MEETING THE CORR AND AMP CRITERIA AT DS {DS.id}')
                     continue
@@ -817,17 +861,23 @@ if densify_wl_dahiti:
             DS.juxtapose_gauge_data_to_vs(adjusted_gauge_data)
             DS.get_closest_in_situ_daily_wl(adjusted_gauge_data, DS.wl.index.min(), DS.wl.index.max())
 
-            DS.juxtaposed_wl = DS.juxtaposed_wl.loc[DS.juxtaposed_wl['mission'].str.contains('SWOT', na=False)]
-            if len(DS.juxtaposed_wl) == 0:
+            # DS.juxtaposed_wl = DS.juxtaposed_wl.loc[DS.juxtaposed_wl['mission'].str.contains('SWOT', na=False)]  # JUST SWOT
+            # if len(DS.juxtaposed_wl) == 0:  # JUST SWOT
+            if len(DS.juxtaposed_wl.loc[DS.juxtaposed_wl['mission'].str.contains('SWOT', na=False)]) == 0:
                 # rmse_sc, rmse_ss, rmse_sn, rmse_sr, nse_sc, nse_ss, nse_sn, nse_sr = [np.nan for x in range(8)]
                 # accuracies.append(
                 #     [DS.id, DS.chainage, velocity, len(DS.densified_wl), len(DS.upstream_adjacent_vs), mean_bias,
                 #      mean_uncrt, np.nan, np.nan, rmse_c, rmse_s, rmse_n, rmse_r, rmse_sc, rmse_ss, rmse_sn, rmse_sr,
                 #      nse_c, nse_s, nse_n, nse_r, nse_sc, nse_ss, nse_sn, nse_sr, DS.x, DS.y])
                 continue
+            vs_with_swot_data = []
             for VS in DS.upstream_adjacent_vs:
-                VS.juxtaposed_wl = VS.juxtaposed_wl.loc[VS.juxtaposed_wl['mission'].str.contains('SWOT', na=False)]
-            DS.densified_wl = DS.densified_wl.loc[DS.densified_wl['mission'].str.contains('SWOT', na=False)]
+                # VS.juxtaposed_wl = VS.juxtaposed_wl.loc[VS.juxtaposed_wl['mission'].str.contains('SWOT', na=False)]  # JUST SWOT
+                if len(VS.juxtaposed_wl.loc[VS.juxtaposed_wl['mission'].str.contains('SWOT', na=False)]) > 0:
+                    vs_with_swot_data.append(VS)
+            DS.upstream_adjacent_vs = vs_with_swot_data
+
+            # DS.densified_wl = DS.densified_wl.loc[DS.densified_wl['mission'].str.contains('SWOT', na=False)]  # JUST SWOT
             DS.get_daily_interpolated_wl_ts(method=itpd_method)  # TUTAJ DODAJE METODE LINIOWA
             DS.get_single_vs_interpolated_ts()
             DS.dist_weighted_daily_wl = DS.get_dist_weighted_wl(DS.densified_wl)
@@ -838,30 +888,46 @@ if densify_wl_dahiti:
             DS.get_densified_wl_by_regressions(velocity)
             DS.densified_wl_by_regr_daily = DS.get_dist_weighted_wl(DS.densified_wl_by_regr_ts)
             DS.densified_wl_by_regr_itpd = DS.interpolate(DS.densified_wl_by_regr_daily)
-            DS.get_spline_interpolated_ts(DS.dist_weighted_daily_wl, 'wl_weighted', 5)
+
+            densified_by_regression_outl = sc.filter_outliers_by_tstudent_test(DS.densified_wl_by_regr_ts)
+            densified_by_regression_outl_daily = DS.get_dist_weighted_wl(densified_by_regression_outl)
+            densified_by_regression_outl_itpd = DS.interpolate(densified_by_regression_outl_daily)
+
+        # DS.get_spline_interpolated_ts(DS.dist_weighted_daily_wl, 'wl_weighted', 5)
             rmse_sc, nse_sc = DS.get_rmse_nse_values(DS.interpolated_wl, DS.wl.index.min(), DS.wl.index.max(), 'SWOT CLASSIC METHOD:')
-            rmse_ss, nse_ss = DS.get_rmse_nse_values(DS.spline_itpd_wl, DS.wl.index.min(), DS.wl.index.max(), 'SWOT SPLINE AND DIST WEIGHT:')
+            # rmse_ss, nse_ss = DS.get_rmse_nse_values(DS.spline_itpd_wl, DS.wl.index.min(), DS.wl.index.max(), 'SWOT SPLINE AND DIST WEIGHT:')
             rmse_sn, nse_sn = DS.get_rmse_nse_values(DS.normalized_ts_itpd, DS.wl.index.min(), DS.wl.index.max(), 'SWOT NORMALIZED')
             rmse_srg, nse_srg = DS.get_rmse_nse_values(DS.densified_wl_by_regr_itpd, DS.densified_wl_by_regr_itpd.index.min(),DS.densified_wl_by_regr_itpd.index.max(), 'REGRESSIONS')
+            rmse_srgo, nse_srgo = DS.get_rmse_nse_values(densified_by_regression_outl_itpd, densified_by_regression_outl_itpd.index.min(), densified_by_regression_outl_itpd.index.max(), 'REGRESSIONS OUTLS')
             rmse_sr, nse_sr = DS.get_rmse_nse_values(DS.single_VS_itpd, DS.wl.index.min(), DS.wl.index.max(), 'SWOT RAW INTERPOLATION')
+            rmse_srgd, nse_srgd = DS.get_rmse_nse_values(DS.densified_wl_by_regr_daily,
+                                                         DS.densified_wl_by_regr_daily.index.min(),
+                                                         DS.densified_wl_by_regr_daily.index.max(), 'DAILY')
+            rmse_srd, nse_srd = DS.get_rmse_nse_values(DS.wl['wse'].resample('D').mean(), DS.wl.index.min(),
+                                                       DS.wl.index.max(), 'SINGLE')
             swot_mean_bias, swot_mean_uncrt = DS.densified_wl['bias'].mean(), DS.densified_wl['uncertainty'].mean()
             if all_vs:
                 accuracies.append(
                     [DS.id, DS.chainage, velocity, len(DS.densified_wl), len(DS.upstream_adjacent_vs), mean_bias,
-                     mean_uncrt, swot_mean_bias, swot_mean_uncrt, rmse_c, rmse_s, rmse_n, rmse_r, rmse_sc, rmse_ss,
-                     rmse_sn, rmse_sr, nse_c, nse_s, nse_n, nse_r, nse_sc, nse_ss, nse_sn, nse_sr, DS.x, DS.y])
+                     mean_uncrt, swot_mean_bias, swot_mean_uncrt, rmse_c, rmse_s, rmse_n, rmse_r, rmse_sc,
+                     rmse_sn, rmse_sr, nse_c, nse_s, nse_n, nse_r, nse_sc, nse_sn, nse_sr, DS.x, DS.y])
             else:
+                new_accs.append([DS.id, DS.chainage, velocity, rmse_sc, rmse_sn, rmse_srg, rmse_srgo, rmse_sr, rmse_srgd, rmse_srd,
+                                 nse_sc, nse_sn, nse_srg, nse_srgo, nse_sr, nse_srgd, nse_srd, DS.x, DS.y])
                 accuracies.append(
                     [DS.id, DS.chainage, velocity, len(DS.densified_wl), len(DS.upstream_adjacent_vs), swot_mean_bias,
-                     swot_mean_uncrt, rmse_sc, rmse_ss, rmse_sn, rmse_srg, rmse_sr, nse_sc, nse_ss, nse_sn, nse_srg,
+                     swot_mean_uncrt, rmse_sc, rmse_sn, rmse_srg, rmse_sr, nse_sc, nse_sn, nse_srg,
                      nse_sr, DS.x, DS.y])
             print(f'Regressions based on {DS.regressions_df["data_len"].min()} to {DS.regressions_df["data_len"].max()} concurrent measurements______________________________')
         if all_vs:
             res_df = pd.DataFrame(accuracies, columns=res_cols_all_vs)
         else:
-            res_df = pd.DataFrame(accuracies, columns=res_cols_swot)
+            # res_df = pd.DataFrame(accuracies, columns=res_cols_swot)
+            res_df = pd.DataFrame(new_accs, columns=new_accs_cols)
         res_df.to_csv(f'{data_dir}accuracies_at_{river_name.split(",")[0]}_{str(t1)[:10]}_to_{str(t2)[:10]}_'
-                      f'corr{str(corr_thres).replace(".", "")}_amp{str(amp_thres).replace(".", "")}_minmax.csv', sep=';')
+                      f'corr{str(corr_thres).replace(".", "")}_amp{str(amp_thres).replace(".", "")}_regression.csv',
+                      sep=';')
+
         print(res_df)
         print(1)
 
@@ -880,7 +946,7 @@ if densify_wl_dahiti:
         #     plt.tight_layout()
         #     fig.suptitle(
         #         f'{len(filtered_df)} VS at the {current_river.name} River')
-        # # plt.show()
+        # # plt.show(block=True)
         # plt.savefig(f'{data_dir}accuracies_scatterplot_at_{river_name.split(",")[0]}.png', dpi=300)
         #
         """ BOXPLOT OF ACCURACIES """
@@ -908,7 +974,7 @@ if densify_wl_dahiti:
         # fig.suptitle(
         #     f'Accuracy of different densification methods at {len(selected_data1)} VS at the {riv} River \n corr. thres.: {corr_thres}, velocity: {round(velocity, 2)} m/s, buffer: {buffer} km, up to {gauge_dist_thres} km from gauge, norm: {norm_method}, interpolation: {itpd_method}')
         # plt.tight_layout()
-        # # plt.show()
+        # # plt.show(block=True)
         # plt.savefig(f'{data_dir}accuracies_at_{river_name.split(",")[0]}_v2.png', dpi=300)
 
         """ BOXPLOT OF ACCURACIES (SWOT ONLY) """
@@ -936,8 +1002,69 @@ if densify_wl_dahiti:
         # fig.suptitle(
         #     f'Accuracy of different densification methods at {len(selected_data1)} VS at the {riv} River \n corr. thres.: {corr_thres}, velocity: {round(velocity, 2)} m/s, buffer: {buffer} km, up to {gauge_dist_thres} km from gauge, norm: {norm_method}, interpolation: {itpd_method}')
         # plt.tight_layout()
-        # plt.show()
+        # plt.show(block=True)
         print(1)
+
+        """ BOXPLOT OF ACCURACIES (JUST RAW AND SRG) """
+        # metric, metric2 = 'RMSE [m]', 'NSE'
+        # cols1 = ['rmse_srg', 'rmse_sr']
+        # cols2 = ['nse_srg', 'nse_sr']
+        # fig, (ax, ax2) = plt.subplots(1, 2, figsize=(7, 5))
+        # # ax.boxplot(res_df[res_df.columns[[5,7,8,9,11,12]]].dropna(axis=0))  # RMSE
+        # selected_data1 = res_df[cols1].dropna(axis=0).loc[~res_df['id'].isin(neigh_dam_vs)]
+        # selected_data2 = res_df[cols2].dropna(axis=0).loc[~res_df['id'].isin(neigh_dam_vs)]
+        # ax.boxplot(selected_data1)
+        # ax.set_xlabel('Methods')
+        # ax.set_ylabel(metric)
+        # cols1_labels = [f'{lab}\nmean: {round(res_df[col].mean(), 3)}' for lab, col in
+        #                 [('RMSE densified RS', cols1[0]), ('RMSE just RS', cols1[1])]]
+        # print(cols1_labels)
+        # ax.set_xticklabels(cols1_labels)
+        #
+        # ax2.boxplot(selected_data2)
+        # ax2.set_xlabel('Methods')
+        # ax2.set_ylabel(metric2)
+        # cols2_labels = [f'{lab}\nmean: {round(res_df[col].mean(), 3)}' for lab, col in
+        #                 [('NSE densified RS', cols2[0]), ('NSE just RS', cols2[1])]]
+        # ax2.set_xticklabels(cols2_labels)
+        #
+        # ax.grid(True, linestyle='--', alpha=0.6)
+        # ax2.grid(True, linestyle='--', alpha=0.6)
+        # fig.suptitle(
+        #     f'Accuracy of daily water level time series based on {len(selected_data1)} RS at the {riv} River')
+        # plt.tight_layout()
+        # plt.show(block=True)
+
+
+    """ ACCURACIES PLOT """
+    # metric, metric2 = 'RMSE [m]', 'NSE'
+    # cols1 = ['rmse_dst', 'rmse_rms']
+    # cols2 = ['nse_dst', 'nse_rms']
+    # fig, (ax, ax2) = plt.subplots(1, 2, figsize=(7, 5))
+    # # ax.boxplot(res_df[res_df.columns[[5,7,8,9,11,12]]].dropna(axis=0))  # RMSE
+    # selected_data1 = res_df[cols1].dropna(axis=0).loc[~res_df['id'].isin(neigh_dam_vs)]
+    # selected_data2 = res_df[cols2].dropna(axis=0).loc[~res_df['id'].isin(neigh_dam_vs)]
+    # ax.boxplot(selected_data1)
+    # ax.set_xlabel('Methods')
+    # ax.set_ylabel(metric)
+    # cols1_labels = [f'{lab}\nmean: {round(res_df[col].mean(), 3)}' for lab, col in
+    #                 [('RMSE densified RS', cols1[0]), ('RMSE just RS', cols1[1])]]
+    # print(cols1_labels)
+    # ax.set_xticklabels(cols1_labels)
+    #
+    # ax2.boxplot(selected_data2)
+    # ax2.set_xlabel('Methods')
+    # ax2.set_ylabel(metric2)
+    # cols2_labels = [f'{lab}\nmean: {round(res_df[col].mean(), 3)}' for lab, col in
+    #                 [('NSE densified RS', cols2[0]), ('NSE just RS', cols2[1])]]
+    # ax2.set_xticklabels(cols2_labels)
+    #
+    # ax.grid(True, linestyle='--', alpha=0.6)
+    # ax2.grid(True, linestyle='--', alpha=0.6)
+    # fig.suptitle(
+    #     f'Accuracy of daily water level time series based on {len(selected_data1)} RS at the {riv} River')
+    # plt.tight_layout()
+    # plt.show(block=True)
 
     """ ANALYSE CORRELATIONS BETWEEN VS (DAM IMPACT ANALYSIS) """
     # def znajdz_najblizsze_num_bez_duplikatow(dane):
@@ -986,7 +1113,7 @@ if densify_wl_dahiti:
     #         fig, ax = plt.subplots()
     #         ax.scatter(df_merged['wse_df1'], df_merged['wse_df2'])
     #         ax.set_title(f'{vs1_id} vs. {vs2_id}')
-    #         plt.show()
+    #         plt.show(block=True)
 
     """" DAMS BETWEEN """
     # current_river.get_dams_chainages()
@@ -1008,7 +1135,7 @@ if densify_wl_dahiti:
     #                     fontsize=8, color='black')
     #         ax.annotate(str(vs2_chain), (VS2.x, VS2.y), textcoords="offset points", xytext=(5, 5), ha='center',
     #                     fontsize=8, color='black')
-    #         plt.show()
+    #         plt.show(block=True)
 
 
     """ HOVMULLER DIAGRAM """
@@ -1092,4 +1219,4 @@ if densify_wl_dahiti:
     # plt.gcf().autofmt_xdate() # Automatyczne formatowanie dat
     #
     # plt.tight_layout() # Dopasowanie elementów, aby nie nachodziły na siebie
-    # plt.show()
+    # plt.show(block=True)

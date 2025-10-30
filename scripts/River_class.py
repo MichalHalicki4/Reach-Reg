@@ -1,7 +1,7 @@
 import geopandas as gpd
 from shapely.geometry import LineString, MultiLineString, Point, Polygon, MultiPolygon
 from shapely.ops import unary_union, linemerge, nearest_points
-
+import matplotlib.pyplot as plt
 from shapely import MultiLineString, LineString
 import json
 import requests
@@ -9,43 +9,74 @@ import pandas as pd
 
 
 dahiti_river_names_and_basins = {
-    'Odra': {'river': 'Oder, River', 'river_names': ['Oder, River'], 'basin': 'Oder', 'up_reach': 24222900416, 'dn_reach': 24230000176, 'country': 'poland'},
-    'Warta': {'river': 'Warta, River', 'river_names': ['Warta, River'], 'basin': 'Oder', 'up_reach': 24229000296, 'dn_reach': 24223000011, 'country': 'poland'},
-    'Wisla': {'river': 'Wisła, River', 'river_names': ['Wisła, River', 'Vistula, River'], 'basin': 'Wisla', 'up_reach': 24244600846, 'dn_reach': 24230000025, 'country': 'poland'},
-    'Bug': {'river': 'Bug, River', 'river_names': ['Bug, River'], 'basin': 'Wisla', 'up_reach': 24249900333, 'dn_reach': 24249100011, 'country': 'poland'},
-    'Narew': {'river': 'Narew, River', 'river_names': ['Narew, River'], 'basin': 'Wisla', 'up_reach': 24248000166, 'dn_reach': 24245000011, 'country': 'poland'},
-    'San': {'river': 'San, River', 'river_names': ['San, River'], 'basin': 'Wisla', 'up_reach': 24244900286, 'dn_reach': 24244700011, 'country': 'poland'},
-    'Niemen': {'river': 'Nemunas, River', 'river_names': ['Nemunas, River'], 'basin': 'Neman', 'up_reach': 24260900146, 'dn_reach': 24250000436, 'country': 'lithuania'},
-    'Elbe': {'river': 'Elbe, River', 'river_names': ['Elbe, River'], 'basin': 'Elbe', 'up_reach': 23286000676, 'dn_reach': 23270700021, 'country': 'germany'},
-    'Rhine': {'river': 'Rhine, River', 'river_names': ['Rhine, River'], 'basin': 'Rhine', 'up_reach': 23269000384, 'dn_reach': 23250900015, 'country': 'germany'},
-    'Danube': {'river': 'Danube, River', 'river_names': ['Danube, River'], 'basin': 'Danube', 'up_reach': 22799700131, 'dn_reach': 22710500031, 'country': 'danube'}
+    'Oder': {'river': 'Oder, River', 'river_names': ['Oder, River'], 'basin': 'Oder', 'up_reach': 24222700041, 'dn_reach': 24221000081, 'country': 'poland'},
+    # 'Warta': {'river': 'Warta, River', 'river_names': ['Warta, River'], 'basin': 'Oder', 'up_reach': 24229000296, 'dn_reach': 24223000011, 'country': 'poland'},
+    # 'Wisla': {'river': 'Wisła, River', 'river_names': ['Wisła, River', 'Vistula, River'], 'basin': 'Wisla', 'up_reach': 24244600846, 'dn_reach': 24230000025, 'country': 'poland'},
+    # 'Bug': {'river': 'Bug, River', 'river_names': ['Bug, River'], 'basin': 'Wisla', 'up_reach': 24249900333, 'dn_reach': 24249100011, 'country': 'poland'},
+    # 'Narew': {'river': 'Narew, River', 'river_names': ['Narew, River'], 'basin': 'Wisla', 'up_reach': 24248000166, 'dn_reach': 24245000011, 'country': 'poland'},
+    # 'San': {'river': 'San, River', 'river_names': ['San, River'], 'basin': 'Wisla', 'up_reach': 24244900286, 'dn_reach': 24244700011, 'country': 'poland'},
+    # 'Niemen': {'river': 'Nemunas, River', 'river_names': ['Nemunas, River'], 'basin': 'Neman', 'up_reach': 24260900146, 'dn_reach': 24250000436, 'country': 'lithuania'},
+    'Elbe': {'river': 'Elbe, River', 'river_names': ['Elbe, River'], 'basin': 'Elbe', 'up_reach': 23285000251, 'dn_reach': 23281000101, 'country': 'germany'},
+    'Rhine': {'river': 'Rhine, River', 'river_names': ['Rhine, River'], 'basin': 'Rhine', 'up_reach': 23267000091, 'dn_reach': 23261000151, 'country': 'germany'},
+    # 'Danube': {'river': 'Danube, River', 'river_names': ['Danube, River'], 'basin': 'Danube', 'up_reach': 22799700131, 'dn_reach': 22710500031, 'country': 'danube'},
+    'Po': {'river': 'Po, River', 'river_names': ['Po, River'], 'basin': 'Po', 'up_reach': 21406901046,
+               'dn_reach': 21406100345, 'country': 'italy'},
+    'Missouri': {'river': 'Missouri, River', 'river_names': ['Missouri, River'], 'basin': 'Missouri',
+                 'up_reach': 74295500011, 'dn_reach': 74291100011, 'country': 'United States of America'},
+    'Mississippi': {'river': 'Mississippi, River', 'river_names': ['Mississippi, River'], 'basin': 'Mississippi',
+                    'up_reach': 74270900041, 'dn_reach': 74270100011, 'country': 'United States of America'},
+    'Solimoes': {'river': 'Solimões, River', 'river_names': ['Solimões, River'], 'basin': 'Solimões',
+                    'up_reach': 62293900141,'dn_reach': 62293100061, 'country': 'Brazil'},
+    'Ganges': {'river': 'Ganges, River', 'river_names': ['Ganges, River'], 'basin': 'Ganges',
+                 'up_reach': 45243500161, 'dn_reach': 45243100011, 'country': 'India'}
+}
+
+
+configs = {
+    'Oder': {'velocity': 30 / 36, 'buffer': 150, 'corr_thres': 0.8, 'amp_thres': 1, 'rmse_thres': 0.5, 'single_rmse_thres': 0.2, 'itpd_method': 'akima'},
+    'Wisla': {'velocity': 30 / 36, 'buffer': 150, 'corr_thres': 0.8, 'amp_thres': 1, 'rmse_thres': 0.5, 'single_rmse_thres': 0.2, 'itpd_method': 'akima'},
+    'Rhine': {'velocity': 30 / 36, 'buffer': 150, 'corr_thres': 0.8, 'amp_thres': 1, 'rmse_thres': 0.5, 'single_rmse_thres': 0.2, 'itpd_method': 'akima'},
+    'Elbe': {'velocity': 30 / 36, 'buffer': 150, 'corr_thres': 0.8, 'amp_thres': 1, 'rmse_thres': 0.5, 'single_rmse_thres': 0.2, 'itpd_method': 'akima'},
+    'Danube': [],
+    'Po': {'velocity': 40 / 36, 'buffer': 300, 'corr_thres': 0.7, 'amp_thres': 2, 'rmse_thres': 1.5, 'single_rmse_thres': 0.2, 'itpd_method': 'akima'},
+    'Mississippi': {'velocity': 40 / 36, 'buffer': 300, 'corr_thres': 0.7, 'amp_thres': 1, 'rmse_thres': 1.5, 'single_rmse_thres': 0.2, 'itpd_method': 'akima'}
 }
 
 vs_with_neight_dams = {
-    'Odra': [],
+    'Oder': [41867, 23411],
     'Warta': [],
     'Wisla': [],
     'Bug': [],
     'Narew': [],
     'San': [],
     'Niemen': [],
-    'Rhine': [45499, 45497],
-    'Elbe': [41949, 27218, 16651, 38476],
-    'Danube': []
+    'Rhine': [],
+    'Elbe': [38476],
+    'Danube': [],
+    'Po': [46234],
+    'Missouri': [41781, 15919, 41780, 16074, 14684],
+    'Mississippi': [22863, 36574, 46325, 36617, 46317],
+    'Solimoes': [],
+    'Ganges': [13062]
 }
 
 """ SWORD REACHES WITH A TRIBUTARY AT THE DOWNSTREAM EDGE. LISTS ARE SORTED FROM UP TO DOWNSTREAM """
 river_tributary_reaches = {
-    'Odra': [24222100011],  # Warta
+    'Oder': [24222100011],  # Warta
     'Warta': [],
     'Wisla': [24244600451, 24244600041, 24244600011, 24244300011, 24244100011],  # Dunajec, Wisłoka, San, Pilica, Narew
     'Bug': [],
     'Narew': [],
     'San': [],
     'Niemen': [],
-    'Rhine': [23267000011, 23265000011, 23263000011, 23261000281],  # Neckar, Main, Mosel, Ruhr
-    'Elbe': [23285000031, 23285000011, 23281000241],  # Mulde, Saale, Havel
-    'Danube': []
+    'Rhine': [23265000011],  # Neckar 23267000011, Main, Mosel 23263000011, Ruhr 23261000281
+    'Elbe': [23285000011, 23281000241],  # Mulde 23285000031, Saale, Havel
+    'Danube': [],
+    'Po': [],
+    'Missouri': [74295100011],  # PLATTE
+    'Mississippi': [],
+    'Solimoes': [],
+    'Ganges': []
 }
 
 
@@ -274,6 +305,14 @@ def prepare_river_object(riv_path, riv, metric_crs):
     current_river.get_simplified_geometry()
     return current_river
 
+
+def plot_river_profile(riv):
+    fig, ax = plt.subplots()
+    ax.plot(riv.gdf['dist_out'] / 1000, riv.gdf['wse'])
+    ax.grid(linestyle='dashed', alpha=0.6)
+    ax.set_ylabel('WSE [m]')
+    ax.set_xlabel('Chainage [km]')
+    plt.show(block=True)
 
 # river_name, basin_name, up_reach, dn_reach = dahiti_river_names_and_basins['odra'].values()
 # riv_path = '/Users/michalhalicki/Documents/nauka/dane_gis/SWORD_v17b_shp/EU/eu_sword_reaches_hb24_v17b.shp'
