@@ -7,6 +7,14 @@ figs_tabs/*
 scripts/gauge_data_downloading/*
 scripts/analyse_clean_results.py
 
+!data/g_data/.gitkeep
+!data/vs_data/.gitkeep
+!data/rivers/.gitkeep
+!results/timeseries/.gitkeep
+!results/rs_stations/.gitkeep
+!figs_tabs/.gitkeep
+!scripts/gauge_data_downloading/.gitkeep
+
 *.pyc
 __pycache__/
 .ipynb_checkpoints/
