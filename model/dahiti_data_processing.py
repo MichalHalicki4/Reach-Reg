@@ -5,7 +5,7 @@ from dahitiapi.DAHITI import DAHITI
 from model.Station_class import VirtualStation
 
 
-def prepare_vs_stations_for_river(riv_obj, riv_nm, riv_nms, basin_nm, t1, t2, res_dir, loaded_gauges=None, vel=None):
+def prepare_vs_stations_for_river(riv_obj, t1, t2, res_dir, loaded_gauges=None, vel=None):
     """
         Prepares a list of Virtual Stations (VS) for a specific river by downloading data
         from the DAHITI platform, processing their geometry, filtering time series, and
@@ -20,9 +20,6 @@ def prepare_vs_stations_for_river(riv_obj, riv_nm, riv_nms, basin_nm, t1, t2, re
         level measurements for validation or comparison.
 
         :param riv_obj: River object containing geometrical data, used for chainage calculation.
-        :param riv_nm: Main river name (e.g., 'Po, Italy'), used for file naming.
-        :param riv_nms: A list of specific river/target names (from DAHITI) to filter the VS.
-        :param basin_nm: Name of the hydrological basin for initial DAHITI filtering.
         :param t1: Start date/time for filtering the VS time series.
         :param t2: End date/time for filtering the VS time series.
         :param res_dir: Directory path where the resulting pickle file will be saved/loaded from.
@@ -30,8 +27,7 @@ def prepare_vs_stations_for_river(riv_obj, riv_nm, riv_nms, basin_nm, t1, t2, re
         :param vel: Velocity parameter used in the calculation of juxtaposed measurements, particularly in time-shifting. Defaults to None.
         :returns: A sorted list of processed VirtualStation objects.
         """
-    riv = riv_nm.split(",")[0]
-    filepath = f'{res_dir}vs_at_{riv}.pkl' if loaded_gauges != {} else f'{res_dir}vs_at_{riv}_no_gdata.pkl'
+    filepath = f'{res_dir}vs_at_{riv_obj.name}_dahiti.pkl' if loaded_gauges != {} else f'{res_dir}vs_at_{riv_obj.name}_no_gdata.pkl'
     if os.path.exists(filepath):
         print(f"File already exists '{filepath}'. Skipping the DAHITI downloading.")
         with open(filepath, "rb") as f:
@@ -41,11 +37,12 @@ def prepare_vs_stations_for_river(riv_obj, riv_nm, riv_nms, basin_nm, t1, t2, re
     if loaded_gauges is None:
         loaded_gauges = {}
     dahiti = DAHITI()
-    data = dahiti.list_targets(args={'basin': basin_nm})
-    vs_stations = [(vs['dahiti_id'], vs['longitude'], vs['latitude']) for vs in data if vs['target_name'] in riv_nms]
+    all_targets = dahiti.list_targets(args={})
+    all_reach_ids = riv_obj.gdf['reach_id'].unique()
+    data = [x for x in all_targets if x['SWORD_reach_id'] in all_reach_ids]
     vs_objects = []
-    for vs_set in vs_stations:
-        vs_id, vs_x, vs_y = vs_set[0], vs_set[1], vs_set[2]
+    for vs_set in data:
+        vs_id, vs_x, vs_y = vs_set['dahiti_id'], vs_set['longitude'], vs_set['latitude']
         vs = VirtualStation(vs_id, vs_x, vs_y)
         if vs.is_away_from_river(riv_obj, 5000):
             continue
@@ -53,11 +50,14 @@ def prepare_vs_stations_for_river(riv_obj, riv_nm, riv_nms, basin_nm, t1, t2, re
         if len(loaded_gauges.keys()) > 0:
             vs.find_closest_gauge_and_chain(loaded_gauges)
         vs.get_water_levels(dahiti)
-        if type(vs.wl) != pd.DataFrame:
+        vs.river = riv_obj.name
+
+        if type(vs.wl) != pd.DataFrame or len(vs.wl) == 0:
             continue
         vs.time_filter(t1, t2)
         if len(vs.wl) == 0:
             continue
+        vs.wl.loc[vs.wl['mission'] == 'swot', 'wse_u'] += 0.2
         if len(loaded_gauges.keys()) == 0:
             vs.get_juxtaposed_vs_and_gauge_meas(None, None, None)
             vs_objects.append(vs)

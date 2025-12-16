@@ -1,3 +1,4 @@
+import math
 import geopandas as gpd
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
@@ -10,7 +11,7 @@ import pandas as pd
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 import copy
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_squared_error, mean_absolute_error
 import hydroeval as he
 import sklearn.svm as svm
 from . import station_utils as s_utils
@@ -52,13 +53,14 @@ class GaugeStation:
 class VirtualStation:
     def __init__(self, vs_id, x, y):
         self.id = vs_id
-        self.x, self.y = x, y
+        self.x, self.y = float(x), float(y)
         self.river, self.chainage = None, None
         self.wl, self.swot_wl, self.geoid, self.swot_mmxo_rbias, self.slope_correction = None, None, None, None, None
         self.neigh_g_up, self.neigh_g_up_chain, self.neigh_g_dn, self.neigh_g_dn_chain = None, None, None, None
         self.closest_gauge = None
         self.juxtaposed_wl = pd.DataFrame()
         self.mean_g_wl, self.mean_vs_wl = None, None
+        self.c, self.v_uncrt_range = None, None
         self.slope = None
         self.single_VS_itpd = None
 
@@ -97,20 +99,17 @@ class VirtualStation:
         """
         try:
             try:
-                wl_data = dahiti.download_water_level(self.id, parameters=['mission'])
+                # wl_data = dahiti.download_water_level(self.id, parameters=['mission'])
+                self.wl = pd.DataFrame(dahiti.download_water_level_json(self.id))
             except PermissionError:
                 return None
-            if len(wl_data['data']) == 0:
+            if len(self.wl) == 0:
                 return None
         except Exception as e:
             print(e)
             self.wl = 'error'
             return None
-        self.river = wl_data['target_name']
-        self.geoid = wl_data['geoid']
-        self.swot_mmxo_rbias = wl_data['SWOT_MMXO_rbias']
-        self.slope_correction = wl_data['WSS_correction_applied'].replace('yes', 'True').replace('no', 'False')
-        self.wl = pd.DataFrame(wl_data['data'])
+        self.wl.loc[self.wl['mission'] != 'swot', 'wse_u'] += 0.2
         if self.wl['mission'].str.contains('SWOT').any():
             self.swot_wl = self.wl[self.wl['mission'].str.contains('SWOT', na=False)]
         else:
@@ -131,6 +130,9 @@ class VirtualStation:
         self.wl = self.wl.loc[(self.wl['datetime'] > t1) & (self.wl['datetime'] < t2)]
         self.swot_wl = self.swot_wl.loc[
             (pd.to_datetime(self.swot_wl['datetime']) > t1) & (pd.to_datetime(self.swot_wl['datetime']) < t2)]
+        if len(self.juxtaposed_wl) > 0:
+            self.juxtaposed_wl = self.juxtaposed_wl.loc[(self.juxtaposed_wl['dt'] > t1) &
+                                                        (self.juxtaposed_wl['dt'] < t2)]
 
     def upload_chainage(self, chainage):
         """
@@ -287,7 +289,7 @@ class VirtualStation:
         return vs_wl_to_corr['wse'].resample('D').mean().interpolate(method='linear')
 
 
-class DensificationStation(VirtualStation):
+class ReferenceStation(VirtualStation):
     def __init__(self, vs_object, buffer, itpd_method, speed_ms=None):
         super().__init__(vs_object.id, vs_object.x, vs_object.y)
         self.cval_buff = 0.01
@@ -299,6 +301,7 @@ class DensificationStation(VirtualStation):
         self.closest_in_situ_daily_wl = pd.DataFrame()
         self.densified_ts, self.densified_daily, self.densified_itpd = None, None, None
         self.slopes_dict, self.c = None, None
+        self.u_smooth_svr = None
         self.rmse_thres, self.single_rmse_thres = None, None
         self.rmse, self.nse = None, None
 
@@ -344,6 +347,7 @@ class DensificationStation(VirtualStation):
         self.filter_upstream_stations_by_wl_amplitude(amp_thres)
         self.filter_upstream_stations_by_dams_and_tributaries(dams, tributary_reaches)
         self.upstream_adjacent_vs = [x for x in self.upstream_adjacent_vs if x.id not in other_reaches]
+        self.filter_wrong_stations_with_identical_coords()
 
     def filter_upstream_stations_by_correlation(self, corr_thres, just_swot=False):
         """
@@ -408,6 +412,18 @@ class DensificationStation(VirtualStation):
             if len(vs.wl.loc[vs.wl['mission'].str.contains('SWOT', na=False)]) > 0:
                 vs_with_swot_data.append(vs)
         self.upstream_adjacent_vs = vs_with_swot_data
+
+    def filter_wrong_stations_with_identical_coords(self):
+        """
+        Filters adjacent VS with coords identical to self.coords (this is due to errors in RiverSP).
+
+        :returns: None, updates 'self.upstream_adjacent_vs'.
+        """
+        vs_with_correct_coords = []
+        for vs in self.upstream_adjacent_vs:
+            if vs.x != self.x or vs.y != self.y:
+                vs_with_correct_coords.append(vs)
+        self.upstream_adjacent_vs = vs_with_correct_coords
 
     def is_ds_empty_or_at_edge(self):
         """
@@ -520,15 +536,15 @@ class DensificationStation(VirtualStation):
                 st_low_chain = vs2
                 st_high_chain = vs1
 
-            a, b, r2, rmse, data_len = s_utils.get_linear_regression_coeffs_btwn_stations(st_low_chain, st_high_chain,
-                                                                                          res_str)
+            a, b, r2, rmse, data_len, a_err, b_err, cov_ab = s_utils.\
+                get_linear_regression_coeffs_btwn_stations(st_low_chain, st_high_chain, res_str)
 
             if a is not None:
                 regressions.append({
                     'st1': st_low_chain.id, 'st2': st_high_chain.id,
                     'st1_chain': st_low_chain.chainage, 'st2_chain': st_high_chain.chainage,
                     'a': a, 'b': b, 'r2': r2, 'rmse': rmse, 'data_len': data_len,
-                    'steps': 1
+                    'steps': 1, 'a_err': a_err, 'b_err': b_err, 'cov_ab': cov_ab
                 })
 
         for i in range(len(all_stations) - 2):
@@ -542,15 +558,15 @@ class DensificationStation(VirtualStation):
                 st_low_chain = vs3
                 st_high_chain = vs1
 
-            a, b, r2, rmse, data_len = s_utils.get_linear_regression_coeffs_btwn_stations(st_low_chain, st_high_chain,
-                                                                                          res_str)
+            a, b, r2, rmse, data_len, a_err, b_err, cov_ab = s_utils.\
+                get_linear_regression_coeffs_btwn_stations(st_low_chain, st_high_chain, res_str)
 
             if a is not None:
                 regressions.append({
                     'st1': st_low_chain.id, 'st2': st_high_chain.id,
                     'st1_chain': st_low_chain.chainage, 'st2_chain': st_high_chain.chainage,
                     'a': a, 'b': b, 'r2': r2, 'rmse': rmse, 'data_len': data_len,
-                    'steps': 2
+                    'steps': 1, 'a_err': a_err, 'b_err': b_err, 'cov_ab': cov_ab
                 })
 
         self.regressions_df = pd.DataFrame(regressions).drop_duplicates(subset=['st1', 'st2'])
@@ -600,7 +616,8 @@ class DensificationStation(VirtualStation):
                     print(vs_id, vs2_id, 'Not used!')
                     vs1 = [x for x in [self] + self.upstream_adjacent_vs if x.id == vs_id][0]
                     vs2 = [x for x in [self] + self.upstream_adjacent_vs if x.id == vs2_id][0]
-                    a, b, r2, rmse, data_len = s_utils.get_linear_regression_coeffs_btwn_stations(vs1, vs2, 'h')
+                    a, b, r2, rmse, data_len, a_err, b_err, cov_ab = s_utils.\
+                        get_linear_regression_coeffs_btwn_stations(vs1, vs2, 'h')
                     used_regressions.append([vs_id, vs2_id, rmse, 2])
         df_used_regressions = pd.DataFrame(used_regressions, columns=['st1', 'st2', 'rmse', 'steps'])
         df_used_regressions = df_used_regressions.drop_duplicates()
@@ -642,8 +659,13 @@ class DensificationStation(VirtualStation):
         clipped_line = substring(line_crs_y.iloc[0], start, end)
         return gpd.GeoSeries(clipped_line)
 
-    def interpolate(self, ts):
-        return ts.interpolate(method=self.itpd_method)
+    def interpolate(self, ts, column_name=''):
+        if type(ts) == pd.DataFrame:
+            ts_reindexed = s_utils.reindex_series_to_daily(ts)
+            ts_reindexed[column_name] = ts_reindexed[column_name].interpolate(method=self.itpd_method)
+            return ts_reindexed
+        else:
+            return ts.interpolate(method=self.itpd_method)
 
     def get_densified_wl_by_regressions(self, without_rs=False, rmse_thres=0.5, single_rmse_thres=0.2,
                                         res_str='h'):
@@ -676,7 +698,7 @@ class DensificationStation(VirtualStation):
                 continue
             curr_vs_wl_df = vs.juxtaposed_wl.copy()
             vs_list = sorted([self] + self.upstream_adjacent_vs, key=lambda x: x.chainage)
-            curr_vs_wl_df[['shifted_wl', 'rmse_sum', 'regr_path']] = curr_vs_wl_df.apply(s_utils.calculate_path_for_row,
+            curr_vs_wl_df[['shifted_wl', 'regr_u', 'rmse_sum', 'regr_path']] = curr_vs_wl_df.apply(s_utils.calculate_path_for_row,
                                                                                          axis=1,
                                                                                          args=(
                                                                                              self.id,
@@ -688,6 +710,8 @@ class DensificationStation(VirtualStation):
             curr_vs_wl_df = curr_vs_wl_df.dropna(subset=['shifted_wl'])
             multi_vs_wl_df = pd.concat(
                 [multi_vs_wl_df.dropna(axis=1, how='all'), curr_vs_wl_df.dropna(axis=1, how='all')])
+        no_regr_mask = multi_vs_wl_df['regr_u'].isna()
+        multi_vs_wl_df.loc[no_regr_mask, 'regr_u'] = multi_vs_wl_df.loc[no_regr_mask, 'uncertainty']
         self.densified_ts = multi_vs_wl_df
 
     def calculate_shifted_time_by_curve(self, ts, vel_df):
@@ -776,11 +800,9 @@ class DensificationStation(VirtualStation):
                 slf.densified_ts['rmse_sum'] < rms_thr]
             slf.densified_ts = s_utils.filter_outliers_by_tstudent_test(slf.densified_ts)
 
-            densified_ts_cval = slf.densified_ts.loc[
-                slf.densified_ts['id_vs'] != slf.id]
-            densified_ts_cval_daily = s_utils.get_rmse_weighted_wl(densified_ts_cval)
-            densified_ts_cval_itpd = slf.interpolate(densified_ts_cval_daily)
-            rmse_cval, nse_cval = slf.get_rmse_nse_values(densified_ts_cval_itpd, 'CrossVal', df_true, False)
+            densified_ts_cval = slf.densified_ts.loc[slf.densified_ts['id_vs'] != slf.id]
+            ds_cval, ds_cval_daily, ds_cval_itpd = self.get_svr_smoothed_data(densified_ts_cval)
+            rmse_cval, nse_cval = slf.get_rmse_nse_values(ds_cval_itpd['daily_wse'], 'CrossVal', df_true, False)
             calibration_accuracies.append([c, slf.speed_ms, rmse_cval])
 
         df_calib = pd.DataFrame(calibration_accuracies, columns=['c', 'velocity', 'rmse_cval'])
@@ -791,7 +813,7 @@ class DensificationStation(VirtualStation):
         mean_vel = (vels_at_cval_range.max() + vels_at_cval_range.min()) / 2
         mean_vel_idx = (vels_at_cval_range - mean_vel).abs().idxmin()
         c_cval = c_cvals[mean_vel_idx]
-        self.c = c_cval
+        self.c, self.v_uncrt_range = c_cval, vels_at_cval_range.max() - vels_at_cval_range.min()
 
     def get_rmse_of_cval_ts(self, timeseries, val_ts):
         """
@@ -805,9 +827,10 @@ class DensificationStation(VirtualStation):
         :returns: The calculated CVAL RMSE (Root Mean Square Error).
         """
         ts_cval = timeseries.loc[timeseries['id_vs'] != self.id]
-        ts_daily = s_utils.get_rmse_weighted_wl(ts_cval)
-        ts_itpd = self.interpolate(ts_daily)
-        r, n = self.get_rmse_nse_values(ts_itpd, '', val_ts, False)
+        ts_cval = s_utils.filter_outliers_by_tstudent_test(ts_cval)
+
+        ds_cval, ds_cval_daily, ds_cval_itpd = self.get_svr_smoothed_data(ts_cval)
+        r, n = self.get_rmse_nse_values(ds_cval_itpd['daily_wse'], '', val_ts, False)
         return r
 
     def get_rmse_agg_threshold(self, df_true):
@@ -901,38 +924,200 @@ class DensificationStation(VirtualStation):
         daily_wl = resampled.resample('D').mean()
         self.single_VS_itpd = self.interpolate(daily_wl)
 
-    def get_svr_smoothed_data(self, c=100, gamma=0.0001, epsilon=0.1):
+    def get_svr_smoothed_data(self, input_ts, c=100, gamma=0.0001, epsilon=0.1):
         """
         Applies Support Vector Regression (SVR) to the densified time series
-        ('self.densified_ts') for final smoothing.
-
-        Measurements are weighted inversely proportional to their cumulative regression
-        error ('rmse_sum'), giving higher weights to more reliable points.
-
-        :param c, gamma, epsilon: Hyperparameters for the SVR model.
-        :returns: None, but updates 'self.densified_ts', 'self.densified_daily', and 'self.densified_itpd'.
+        for final smoothing, calculates the SVR smoothing uncertainty (u_smooth),
+        and combines it with propagation uncertainty (u_prop) to get u_final.
         """
-        input_df = self.densified_ts.copy()
+        input_df = input_ts.copy()
         eps = 1e-6
+
+        wse_prop = input_df['shifted_wl'].values
+        u_prop = input_df['regr_u'].values
+
         max_weight_factor = 30
         base_weights = 1 / (input_df['rmse_sum'] + eps)
         min_weight = base_weights.min()
         weights = base_weights / min_weight
         weights = weights.round().astype(int)
         weights = weights.clip(upper=max_weight_factor)
-        svr_rbf = svm.SVR(kernel='rbf', C=c, gamma=gamma, epsilon=epsilon)
 
         index_dates = input_df.index
         start_time = index_dates.min()
         time_deltas = index_dates - start_time
         x_hours = time_deltas.total_seconds() / 3600
         x_train = x_hours.values.reshape(-1, 1)
-        svr_rbf.fit(x_train, input_df['shifted_wl'], sample_weight=weights)
-        y_res = svr_rbf.predict(x_train)
-        input_df['shifted_wl'] = y_res
-        y_res_series_daily = s_utils.get_rmse_weighted_wl(input_df)
-        y_res_series_itpd = y_res_series_daily.interpolate(method=self.itpd_method)
-        self.densified_ts, self.densified_daily, self.densified_itpd = input_df, y_res_series_daily, y_res_series_itpd
+
+        svr_rbf = svm.SVR(kernel='rbf', C=c, gamma=gamma, epsilon=epsilon)
+        svr_rbf.fit(x_train, wse_prop, sample_weight=weights)
+
+        wse_svr = svr_rbf.predict(x_train)
+        input_df['shifted_wl'] = wse_svr  # WSE po wygładzeniu
+
+        residuals = wse_svr - wse_prop
+
+        # SIGMA_SVR = sqrt( SUM(w_j * resid^2) / SUM(w_j) )
+        is_valid = np.isfinite(residuals) & np.isfinite(weights)
+        valid_weights = weights[is_valid]
+        valid_residuals = residuals[is_valid]
+
+        sum_weighted_sq_residuals = np.sum(valid_weights * valid_residuals ** 2)
+        sum_weights = np.sum(valid_weights)
+
+        if sum_weights > eps:
+            u_smooth = np.sqrt(sum_weighted_sq_residuals / sum_weights)
+        else:
+            u_smooth = np.nan
+
+        self.u_smooth_svr = u_smooth
+
+        if not np.isnan(u_smooth):
+            u_final_sq = u_prop ** 2 + u_smooth ** 2
+            input_df['regr_svr_u'] = np.sqrt(u_final_sq)
+        else:
+            input_df['regr_svr_u'] = u_prop.copy()
+
+        y_res_series_daily = s_utils.get_final_weighted_wl(input_df)  # Zmieniona nazwa/logika
+        y_res_series_itpd = self.interpolate(y_res_series_daily, 'daily_wse')
+        return input_df, y_res_series_daily, y_res_series_itpd
+
+    def calculate_interpolation_uncertainty(self):
+        """
+            Calculates the Root Mean Squared Error (RMSE) introduced by the
+            interpolation process using a cross-validation ('gap testing') approach.
+
+            The function systematically removes contiguous segments (gaps) of known
+            WSE values, ranging from 1 to 10 days, and then interpolates these gaps.
+            The RMSE is calculated by comparing the interpolated values with the original
+            known values for each gap length (L) and for each position (P) within that gap.
+
+            Returns:
+                dict: A nested dictionary (L -> P -> RMSE) where L is the gap length
+                      (1-10 days) and P is the position within the gap (0 to L-1),
+                      storing the RMSE for each scenario.
+        """
+        itp_errors = {}
+        ts_original = self.densified_daily['daily_wse'].copy(deep=True)  # Używamy stałej nazwy dla oryginału
+        for gap_len in range(1, 11):
+            acc_list = []
+            for i in range(len(ts_original)):
+                ts = ts_original.copy(deep=True)
+                if i < gap_len or len(ts) - i < gap_len:
+                    continue
+                indices_to_process = [i + step for step in range(gap_len)]
+                subset = ts.iloc[indices_to_process]
+                if subset.isnull().any():
+                    continue
+                values_list = subset.tolist()
+                ts.iloc[indices_to_process] = np.nan
+                try:
+                    ts_itpd = ts.interpolate(method=self.itpd_method)
+                except ValueError as e:
+                    continue
+                itpd_values_list = ts_itpd.iloc[indices_to_process].tolist()
+                if pd.Series(itpd_values_list).isnull().any():
+                    continue
+                errors_sq = (np.array(values_list) - np.array(itpd_values_list)) ** 2
+                acc_list.append(errors_sq.tolist())
+
+            if len(acc_list) > 0:
+                itp_errors[gap_len] = {}
+                test_windows_count = len(acc_list)
+
+                for P in range(gap_len):
+                    curr_sq_errors = [x[P] for x in acc_list]
+                    itp_errors[gap_len][P] = math.sqrt(sum(curr_sq_errors) / len(curr_sq_errors))
+
+        return itp_errors
+
+    def add_uncertainty_column(self):
+        """
+            Adds the interpolation-related uncertainty ('itpd_uncrt') to the
+            densified and interpolated time series (self.densified_itpd).
+
+            This function identifies consecutive NaN groups (gaps) in the daily WSE data
+            and determines their length (L). It then assigns the pre-calculated RMSE
+            from the uncertainty map (generated by calculate_interpolation_uncertainty)
+            based on the gap length (L) and the position (P) within the gap.
+            For gaps longer than the tested maximum (max_L), the uncertainty of the
+            mid-point of the max_L gap is assigned.
+
+            Modifies:
+                self.densified_itpd (DataFrame): Adds the 'itpd_uncrt' column.
+        """
+        uncertainty_map = self.calculate_interpolation_uncertainty()
+        ts_daily = self.densified_daily['daily_wse'].copy()
+        ts_daily = s_utils.reindex_series_to_daily(ts_daily)
+        ts_itpd = self.densified_itpd.copy()
+        ts_itpd = pd.DataFrame(ts_itpd)
+        uncertainty_series = pd.Series(np.nan, index=ts_itpd.index)
+        is_gap = ts_daily.isna()
+        gap_groups = is_gap.ne(is_gap.shift()).cumsum()
+        max_L = max(uncertainty_map.keys())
+
+        max_L_mid_point = max_L // 2
+        if max_L in uncertainty_map and max_L_mid_point in uncertainty_map[max_L]:
+            max_L_mid_uncertainty = uncertainty_map[max_L][max_L_mid_point]
+        else:
+            max_L_mid_uncertainty = np.nan
+
+        for group_id, group_series in ts_daily.groupby(gap_groups):
+            if not group_series.isna().any():
+                continue
+            gap_indices = group_series[group_series.isna()].index
+            gap_len = len(gap_indices)
+            if gap_len in uncertainty_map:
+                for P, index in enumerate(gap_indices):
+                    if P in uncertainty_map[gap_len]:
+                        uncertainty_series.loc[index] = uncertainty_map[gap_len][P]
+                    else:
+                        uncertainty_series.loc[index] = np.nan
+            elif gap_len > max_L and not pd.isna(max_L_mid_uncertainty):
+                for index in gap_indices:
+                    uncertainty_series.loc[index] = max_L_mid_uncertainty
+            else:
+                continue
+        ts_itpd['itpd_uncrt'] = uncertainty_series
+        ts_itpd['itpd_uncrt'] = ts_itpd['itpd_uncrt'].fillna(0)
+        self.densified_itpd = ts_itpd
+
+    def merge_regr_and_itp_uncertainty(self):
+        """
+            Combines the regression/measurement uncertainty and the interpolation
+            uncertainty to derive the final total WSE uncertainty ('wse_u').
+
+            The final uncertainty is calculated by summing the variances of the two error
+            sources:
+            1. Base Variance (regression/measurement uncertainty: 'daily_uncertainty'**2),
+               which is linearly interpolated over data gaps.
+            2. Interpolation Model Variance (from cross-validation: 'itpd_uncrt'**2).
+
+            The final WSE uncertainty ('wse_u') is the square root of the total variance
+            ('var_final'). Renames the 'daily_wse' column to 'wse' for final output.
+
+            Modifies:
+                self.densified_itpd (DataFrame): Replaces the DataFrame with the
+                                               final output columns ['wse', 'wse_u', 'N'].
+        """
+        df = self.densified_itpd.copy()
+
+        df['N'] = df['N'].fillna(0).astype(int)
+        df['var_daily'] = df['daily_uncertainty'] ** 2
+        # 2. Interpolacja Liniowa Wariancji Bazowej
+        df['var_base_interp'] = df['var_daily'].interpolate(
+            method='linear',
+            limit_direction='both'
+        )
+
+        df['var_interp_model'] = df['itpd_uncrt'] ** 2
+        df['var_final'] = df['var_base_interp'] + df['var_interp_model']
+
+        df['wse_u'] = round(np.sqrt(df['var_final']), 3)
+        df = df.rename(columns={'daily_wse': 'wse'})
+        df['wse'] = round(df['wse'], 3)
+
+        self.densified_itpd = df[['wse', 'wse_u', 'N']]
 
     def get_rmse_nse_values(self, interpolated, text, other_validation_ts=pd.Series(), print_res=True):
         """
@@ -961,6 +1146,33 @@ class DensificationStation(VirtualStation):
         if print_res:
             print(f'{text} {self.id} V: {round(self.densified_ts["velocity"].mean(), 3)}m/s, RMSE: {rmse}m, NSE: {nse}')
         return rmse, nse
+
+    def get_percentage_within_uncrt(self):
+        """
+            Calculates the percentage of in situ (gauge) water level observations
+            that fall within the calculated WSE uncertainty range (wse +/- wse_u)
+            of the densified time series.
+
+            This function merges the densified and interpolated WSE time series
+            with the closest corresponding daily in situ water level data.
+            It then determines which in situ values are bounded by the lower
+            (wse - wse_u) and upper (wse + wse_u) limits derived from the model uncertainty.
+
+            Returns:
+                float: Percentage score (0-100) indicating the reliability of the
+                       estimated WSE uncertainty.
+       """
+        df_merged = pd.merge(
+            self.densified_itpd[['wse', 'wse_u']],
+            pd.DataFrame(self.closest_in_situ_daily_wl.values, columns=['val'],
+                         index=self.closest_in_situ_daily_wl.index), left_index=True, right_index=True, how='inner')
+
+        lower = df_merged['wse'] - df_merged['wse_u']
+        upper = df_merged['wse'] + df_merged['wse_u']
+        within_bounds = df_merged['val'].between(lower, upper)
+        score = within_bounds.mean() * 100
+        print(f"Data within uncertainty: {score:.2f}%")
+        return score
 
     def plot_daily_wl(self):
         fig, ax = plt.subplots(figsize=(12, 8))
@@ -1027,7 +1239,16 @@ class DensificationStation(VirtualStation):
         if self.single_VS_itpd is not None and 'single' not in not_plotting:
             ax.plot(self.single_VS_itpd, label='just itp', color='blue')
         if self.densified_ts is not None and 'regr' not in not_plotting:
-            ax.plot(self.densified_itpd, label='regressions', color='purple')
+            ax.plot(self.densified_itpd['wse'], label='regressions', color='purple')
+            ax.fill_between(
+                self.densified_itpd.index,
+                self.densified_itpd['wse'] - self.densified_itpd['wse_u'],
+                self.densified_itpd['wse'] + self.densified_itpd['wse_u'],
+                color='purple',
+                alpha=0.2,
+                label='uncertainty'
+            )
+
             ax.scatter(self.densified_ts['shifted_time'], self.densified_ts['shifted_wl'],
                        marker='.', color='purple')
 

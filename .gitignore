@@ -3,8 +3,10 @@ data/vs_data/*
 data/rivers/*
 results/timeseries/*
 results/rs_stations/*
+figs_tabs/*
+scripts/gauge_data_downloading/*
+scripts/analyse_clean_results.py
 
-# Ogólne reguły Pythona (dobrze jest je zawsze mieć)
 *.pyc
 __pycache__/
 .ipynb_checkpoints/

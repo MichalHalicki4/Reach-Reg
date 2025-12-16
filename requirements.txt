@@ -1,0 +1,28 @@
+# =================================================================
+# Required Python Packages for Reach-Reg Method
+# -----------------------------------------------------------------
+# This file lists the external dependencies required to run the
+# Reach-Reg river water level densification model.
+# =================================================================
+
+# Core Scientific Computing and Data Handling
+pandas
+numpy
+scipy
+
+# Geospatial Data Processing
+geopandas
+shapely
+
+# Machine Learning and Metrics
+sklearn
+hydroeval
+
+# Plotting and Visualization
+matplotlib
+
+# Custom API Wrappers (Dependencies from external services/packages)
+# NOTE: Thee dahitiapi package can be downloaded from https://pypi.org/project/dahitiapi/ 
+
+# 1. DAHITI API Wrapper
+dahitiapi

@@ -3,6 +3,7 @@ from typing import List, Dict, Any, Tuple, Optional
 from scipy import stats
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score, mean_squared_error
+from scipy.odr import ODR, Model, Data, RealData
 import pandas as pd
 from shapely import Point
 import geopandas as gpd
@@ -51,6 +52,23 @@ def select_gauges_from_river(gdata_gdf, river, buff=1000):
     gdata_gdf_metric = gdata_gdf.to_crs(river.metrical_crs)
     river_buffer_metric = gpd.GeoSeries(river.simplified_river).buffer(buff)
     return gdata_gdf_metric[gdata_gdf.to_crs(river.metrical_crs).within(river_buffer_metric.iloc[0])]
+
+
+def filter_gauges_by_target_name(gauges_df, insitu, riv_name):
+    """
+    Filters a GeoDataFrame of all gauge stations to select only those from a given river.
+
+    :param gauges_df: GeoDataFrame containing all gauge stations (points).
+    :param insitu: The InSitu object from Dahiti.
+    :param riv_name: The name of the river.
+    :returns: A filtered GeoDataFrame of gauge stations from a river.
+    """
+    valid_gauges = []
+    for x in gauges_df['id'].unique():
+        target_info = insitu.get_target_info(int(x))
+        if target_info['target_name'] == riv_name or target_info['target_name'] == f'{riv_name}, River':
+            valid_gauges.append(x)
+    return gauges_df[gauges_df['id'].isin(valid_gauges)]
 
 
 def get_chainages_for_all_gauges(curr_gauges, river):
@@ -272,6 +290,52 @@ def get_rmse_weighted_wl(ts):
     return rmse_weighted_daily['wl_weighted']
 
 
+def get_final_weighted_wl(input_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Oblicza dobowe WSE oraz dobową Niepewność (U_daily) używając Ważonej Średniej.
+
+    Zakłada, że df ma kolumny 'shifted_wl' (WSE po SVR) i
+    'regr_svr_u' (u_final z SVR-P.U.).
+    """
+    eps = 1e-6
+    df = input_df.copy(deep=True)
+
+    # 1. Obliczenie wag: w_j = 1 / u_final^2
+    # Zapewnienie, że wariancja jest niezerowa
+    try:
+        df['u_final_safe'] = np.maximum(eps, df['regr_svr_u'])
+    except KeyError:
+        df['u_final_safe'] = np.maximum(eps, df['regr_u'])
+
+    weights_var = df['u_final_safe'] ** 2
+    df['weight'] = 1.0 / weights_var
+
+    # 2. Obliczenie Ważonej Średniej dla WSE
+    df['weighted_wl'] = df['shifted_wl'] * df['weight']
+
+    # Agregacja dzienna
+    daily_aggregated = df.groupby(df.index.date).agg(
+        sum_weighted_wl=('weighted_wl', 'sum'),
+        sum_weights=('weight', 'sum'),
+        # Zliczanie obserwacji dla kontroli
+        N=('shifted_wl', 'count')
+    )
+
+    # 3. Obliczenie finalnej Średniej Dobowej WSE (L_bar)
+    # L_bar = sum(w*L) / sum(w)
+    daily_aggregated['daily_wse'] = daily_aggregated['sum_weighted_wl'] / daily_aggregated['sum_weights']
+
+    # 4. Obliczenie Finalnej Niepewności Dobowej (U_daily)
+    # u_daily^2 = 1 / sum(w)
+    daily_aggregated['daily_uncertainty'] = np.sqrt(1.0 / daily_aggregated['sum_weights'])
+
+    # Czyszczenie i przygotowanie wyników
+    results_df = daily_aggregated[['daily_wse', 'daily_uncertainty', 'N']]
+    results_df.index = pd.to_datetime(results_df.index)
+
+    return results_df[['daily_wse', 'daily_uncertainty', 'N']]  # Zwracamy WSE, U_daily i U
+
+
 def get_vs_neighbors(vs_station, vs_list):
     """
     Finds the immediate upstream ('neighbor_before') and downstream ('neighbor_after')
@@ -331,43 +395,197 @@ def get_regression_coeffs_from_df(regr_df, str1, str2):
     return a, b, r2, commons
 
 
+def linear_func(params, x_data):
+    return params[0] * x_data + params[1]
+
+
+def get_odr_regression_coeffs(regr_df, str1, str2):
+    """
+    Performs an Orthogonal Distance Regression (ODR) (Errors-in-Variables)
+    between two variables, including known uncertainties for both.
+    ...
+    """
+    sigma_system_min = 0.01
+    x = regr_df[str2].values
+    y = regr_df[str1].values
+
+    x_u = np.maximum(regr_df[str2 + '_u'].values, sigma_system_min)
+    y_u = np.maximum(regr_df[str1 + '_u'].values, sigma_system_min)
+
+    linear_model = Model(linear_func)
+
+    data = RealData(
+        x=x,
+        y=y,
+        sx=x_u,
+        sy=y_u
+    )
+
+    ols_model = LinearRegression().fit(x.reshape(-1, 1), y)
+    beta0_ols = [ols_model.coef_[0], ols_model.intercept_]
+    odr_obj = ODR(data, linear_model, beta0=beta0_ols)
+    output = odr_obj.run()
+    a = output.beta[0]
+    b = output.beta[1]
+    a_std_err = output.sd_beta[0]
+    b_std_err = output.sd_beta[1]
+
+    y_pred = linear_func(output.beta, x)  # <--- POPRAWNE OBLICZANIE y_pred
+    ss_total = np.sum((y - np.mean(y)) ** 2)
+    ss_residual = np.sum((y - y_pred) ** 2)
+    r2 = 1.0 if ss_total == 0 else 1 - (ss_residual / ss_total)
+    reduced_chi_sq = output.res_var
+    results = {
+        'a': round(a, 3),
+        'b': round(b, 3),
+        'a_std_err': round(a_std_err, 3),
+        'b_std_err': round(b_std_err, 3),
+        'r2': round(r2, 3),
+        'reduced_chi_sq': round(reduced_chi_sq, 3),
+        'commons': len(regr_df)
+    }
+    return results['a'], results['b'], results['r2'], results['commons']
+
+
+def fit_odr(x, y, x_err=None, y_err=None):  # DANIEL'S SCRIPT
+    """
+    Perform a linear Orthogonal Distance Regression (Total Least Squares).
+
+    Parameters
+    ----------
+    x, y : array-like
+        Input data arrays.
+    x_err, y_err : array-like or None
+        Standard deviations (uncertainties) of x and y values.
+
+    Returns
+    -------
+    result : dict
+        Dictionary containing fit parameters and uncertainties:
+        - 't', 'c': slope and intercept
+        - 't_err', 'c_err': standard errors of parameters
+        - 'cov_tc': covariance between t and c
+        - 'model': the linear model function
+        - 'out': full ODR output object
+    """
+    # Linear model: y = t*x + c
+    def f(B, x):
+        return B[0] * x + B[1]
+
+    # Prepare data for ODR
+    data = RealData(x, y, sx=x_err, sy=y_err)
+    model = Model(f)
+    ols_model = LinearRegression().fit(x.reshape(-1, 1), y)
+    beta0_ols = [ols_model.coef_[0], ols_model.intercept_]
+    odr = ODR(data, model, beta0=beta0_ols)
+    out = odr.run()
+
+    # Extract results
+    t, c = out.beta
+    cov_beta = out.cov_beta
+    t_err, c_err = np.sqrt(np.diag(cov_beta))
+    cov_tc = cov_beta[0, 1]
+
+    result = {
+        "t": t,
+        "c": c,
+        "t_err": t_err,
+        "c_err": c_err,
+        "cov_tc": cov_tc,
+        "model": f,
+        "out": out
+    }
+    return result
+
+
+def predict_odr(x_new, x_err, fit_result):  # DANIEL'S SCRIPT
+    """
+    Compute predicted y values and propagated uncertainties from an ODR fit.
+
+    Parameters
+    ----------
+    x_new : array-like
+        New x values for prediction.
+    x_err : array-like
+        Standard deviations (uncertainties) of x values.
+    fit_result : dict
+        Output dictionary from fit_odr().
+
+    Returns
+    -------
+    y_pred, y_err : np.ndarray
+        Predicted y values and propagated uncertainties.
+    """
+    t = fit_result["t"]
+    c = fit_result["c"]
+    t_err = fit_result["t_err"]
+    c_err = fit_result["c_err"]
+    cov_tc = fit_result["cov_tc"]
+
+    x_new = np.asarray(x_new)
+    x_err = np.asarray(x_err)
+
+    # Predicted y
+    y_pred = t * x_new + c
+
+    # Error propagation:
+    # σ_y² = (x * σ_t)² + σ_c² + (t * σ_x)² + 2 * x * cov_tc
+    y_err = np.sqrt((x_new * t_err)**2 + c_err**2 + (t * x_err)**2 + 2 * x_new * cov_tc)
+
+    return y_pred, y_err
+
+
 def get_linear_regression_coeffs_btwn_stations(st_low_chain, st_high_chain, res_str='h'):
     """
-    Calculates the linear regression coefficients, R-squared, and Root Mean Square Error (RMSE)
-    between the water level time series of two adjacent stations.
-
-    This function first identifies and aligns common timestamps (rounded to the specified
-    resolution) between the two stations before fitting the regression model.
-
-    :param st_low_chain: The station with the lower chainage.
-    :param st_high_chain: The station with the higher chainage.
-    :param res_str: The resampling resolution for the time index ('h' for hourly is default).
-    :returns: A tuple (a, b, r2, rmse, data_len) or NaNs if fewer than 5 common points are found.
+    Calculates ODR parameters, R-squared, and RMSE between two time series,
+    including uncertainty parameters (t_err, c_err, cov_tc) for propagation.
     """
+    # ... (Fragmenty kodu do uzgadniania indeksów czasowych są zachowane) ...
     vs_set = set(pd.to_datetime(st_low_chain.wl['datetime']).dt.round(res_str).drop_duplicates(keep=False))
     vs2_set = set(pd.to_datetime(st_high_chain.wl['datetime']).dt.round(res_str).drop_duplicates(keep=False))
     common_indices = vs_set.intersection(vs2_set)
 
     if len(common_indices) < 5:
-        print(st_low_chain.id, st_high_chain.id, len(common_indices))
-        return np.nan, np.nan, np.nan, np.nan, len(common_indices)
+        # print(st_low_chain.id, st_high_chain.id, len(common_indices))
+        # Zwraca 8 wartości: a, b, r2, rmse, commons + a_err, b_err, cov_ab
+        return np.nan, np.nan, np.nan, np.nan, len(common_indices), np.nan, np.nan, np.nan
 
-    st_low_ts = st_low_chain.wl.set_index(pd.to_datetime(st_low_chain.wl['datetime']).dt.round(res_str))['wse'].loc[
-        list(common_indices)]
-    st_high_ts = st_high_chain.wl.set_index(pd.to_datetime(st_high_chain.wl['datetime']).dt.round(res_str))['wse'].loc[
-        list(common_indices)]
+        # 1. Wyrównanie danych (zakładamy, że 'wl' zawiera 'wse_u' - niepewność WSE)
+    st_low_ts = st_low_chain.wl.set_index(pd.to_datetime(st_low_chain.wl['datetime']).dt.round(res_str)).loc[
+        list(common_indices)].rename(columns={'wse': 'x_wse', 'wse_u': 'x_u'})
+    st_high_ts = st_high_chain.wl.set_index(pd.to_datetime(st_high_chain.wl['datetime']).dt.round(res_str)).loc[
+        list(common_indices)].rename(columns={'wse': 'y_wse', 'wse_u': 'y_u'})
 
-    regr_df = pd.DataFrame(index=list(common_indices))
-    regr_df['x_wse'] = st_low_ts
-    regr_df['y_wse'] = st_high_ts
+    regr_df = pd.concat([st_low_ts[['x_wse', 'x_u']], st_high_ts[['y_wse', 'y_u']]], axis=1)
 
-    a, b, r2, len_common = get_regression_coeffs_from_df(regr_df, 'x_wse', 'y_wse')
+    # Konwencja: st2 (y) = t * st1 (x) + c.
+    # Używamy st_low_chain.id jako st1 i st_high_chain.id jako st2.
+    # Choć to jest niezgodne z hydro-logiką, jest zgodne z Twoją starą logiką.
 
-    ts1, ts2 = a * st_high_chain.wl['wse'] + b, st_low_chain.wl['wse']
-    ts1.index = ts1.index.round('h')
-    ts2.index = ts2.index.round('h')
+    # 2. Fit ODR: WSE_st_high (Y) = t * WSE_st_low (X) + c
+    # Musimy zdecydować, które idzie na X, a które na Y. Utrzymajmy konwencję:
+    # X = st_low_chain, Y = st_high_chain
+    # Poprawienie konwencji z Twojego starego kodu: st_low_chain (X) -> st_high_chain (Y)
 
-    return a, b, r2, get_rmse_between_two_ts(ts1, ts2), len(common_indices)
+    fit_result = fit_odr(
+        regr_df['x_wse'].values, regr_df['y_wse'].values,
+        x_err=regr_df['x_u'].values, y_err=regr_df['y_u'].values
+    )
+
+    a, b, a_err, b_err, cov_tc = fit_result["t"], fit_result["c"], fit_result["t_err"], fit_result["c_err"], fit_result[
+        "cov_tc"]
+
+    # 3. Obliczenie R2 i RMSE
+    # RMSE i R2 są liczone z prognoz Y = t*X + c
+    y_pred = a * regr_df['x_wse'] + b
+    r2 = r2_score(y_true=regr_df['y_wse'], y_pred=y_pred)
+    rmse = np.sqrt(mean_squared_error(regr_df['y_wse'], y_pred))
+
+    len_common = len(common_indices)
+
+    # 4. Zwracanie wyników (zgodnie z poprzednią strukturą + nowe parametry)
+    return round(a, 3), round(b, 3), round(r2, 3), round(rmse, 4), len_common, round(a_err, 4), round(b_err, 4), round(
+        cov_tc, 6)
 
 
 def _apply_regression(known_wse: float, known_station_id: int, reg_row: Dict[str, Any]) -> float:
@@ -420,45 +638,100 @@ def find_regression(st_id1: int, st_id2: int, df: pd.DataFrame) -> Optional[Dict
     return None
 
 
+def propagate_wse_and_uncertainty(
+        known_wse: float,
+        known_u: float,
+        reg_row: Dict[str, Any],
+        known_id: int
+) -> Tuple[float, float]:
+    """
+    Propagates WSE and its uncertainty (U) through a single ODR regression segment,
+    applying the correct P.U. formula based on the propagation direction.
+
+    Args:
+        known_wse: The known WSE value (start point).
+        known_u: The propagated uncertainty (U) of the known WSE.
+        reg_row: The regression parameters row (must contain a, b, a_err, b_err, cov_ab, st1, st2).
+        known_id: The ID of the station where WSE is currently known.
+
+    Returns:
+        Tuple (calculated_wse, calculated_u).
+    """
+    a, b = reg_row["a"], reg_row["b"]
+    st1, st2 = reg_row["st1"], reg_row["st2"]
+
+    # Parametry ODR/P.U. (Zapisane w reg_row jako a_err, b_err, cov_ab)
+    sigma_a, sigma_b, cov_tc = reg_row["a_err"], reg_row["b_err"], reg_row["cov_ab"]
+
+    # SCENARIUSZ 1: PROPAGACJA ZGODNA Z TRENOWANIEM (st1 -> st2), y = t*x + c
+    if known_id == st1:
+        x, sigma_x = known_wse, known_u
+        y_pred = a * x + b
+
+        # Propagacja Niepewności (Wzór Liniowy): σ_y² = (x * σ_t)² + σ_c² + (t * σ_x)² + 2 * x * cov_tc
+        sigma_y_sq = (x * sigma_a) ** 2 + sigma_b ** 2 + (a * sigma_x) ** 2 + 2 * x * cov_tc
+        sigma_y_sq_safe = np.maximum(0, sigma_y_sq)
+
+        return y_pred, np.sqrt(sigma_y_sq_safe)
+
+    # SCENARIUSZ 2: PROPAGACJA PRZECIWNA (st2 -> st1), x = (y-c)/t
+    elif known_id == st2:
+        y, sigma_y = known_wse, known_u
+
+        if a == 0:
+            return np.nan, np.nan
+
+        x_pred = (y - b) / a
+
+        # Wzór Różniczki Totalnej: df/dy = 1/t, df/dt = (-y + c) / t², df/dc = -1/t
+        df_dy = 1 / a
+        df_dt = (-y + b) / (a ** 2)
+        df_dc = -1 / a
+
+        # Wariancja σ_x²
+        sigma_x_sq = (df_dy ** 2 * sigma_y ** 2) + \
+                     (df_dt ** 2 * sigma_a ** 2) + \
+                     (df_dc ** 2 * sigma_b ** 2) + \
+                     2 * df_dt * df_dc * cov_tc
+
+        sigma_x_sq_safe = np.maximum(0, sigma_x_sq)
+        return x_pred, np.sqrt(sigma_x_sq_safe)
+
+    else:
+        raise ValueError("known_id nie pasuje do żadnej stacji w regresji.")
+
+
 def get_wl_by_regression_v_pro(
         start_wse: float,
+        start_u: float, # NOWY ARGUMENT: Niepewność początkowa (np. z Dahiti/SWOT)
         start_station_id: int,
         target_station_id: int,
         regressions_df: pd.DataFrame,
         all_stations_list: List,
         single_rmse_thres: float,
         total_rmse_thres: float
-) -> Tuple[float, float, str]:
+) -> Tuple[float, float, float, str]: # ZWRACA: wse, uncrt_prop, total_rmse, path_string
     """
-    Propagates the water state (WSE) from the starting station to the target station
-    by iteratively using inter-station regressions, implementing a pathfinding algorithm
-    that selects detours (2-step jumps) for weak (high-RMSE) direct connections.
-
-    Args:
-        start_wse: The initial water state.
-        start_station_id: ID of the starting station (where WSE is known).
-        target_station_id: ID of the target station (RS).
-        regressions_df: DataFrame with regression parameters (1-step and 2-step).
-        all_stations_list: An ordered list of all stations along the river.
-        single_rmse_thres: The RMSE threshold for a single connection, classifying it as "weak" if exceeded.
-        total_rmse_thres: The maximum allowable sum of RMSE for the entire propagation path.
+    Przenosi WSE i jego niepewność ze stacji startowej na docelową, używając
+    propagacji niepewności ODR. Wybór ścieżki jest oparty na minimalizacji sumy RMSE ODR.
 
     Returns:
-        A tuple (final_wse, total_rmse, path_string) or (NaN, NaN, "Error message") upon failure.
+        Krotka (final_wse, final_u, total_odr_rmse_sum, path_string) lub (NaN, NaN, NaN, Komunikat błędu).
     """
     if start_station_id == target_station_id:
-        return start_wse, 0, str(start_station_id)
+        return start_wse, start_u, 0, str(start_station_id)
 
     # Data structure preparation
     station_pos_map = {st.id: i for i, st in enumerate(all_stations_list)}
 
     if start_station_id not in station_pos_map or target_station_id not in station_pos_map:
-        return np.nan, np.nan, "Station not found in all_stations_list"
+        return np.nan, np.nan, np.nan, "Station not found in all_stations_list"
 
     current_station_id = start_station_id
     path = [current_station_id]
     wse_at_station = {current_station_id: start_wse}
-    total_rmse = 0.0
+    u_at_station = {current_station_id: start_u} # NOWY SŁOWNIK: Zapisywanie propagowanej niepewności
+    total_odr_rmse = 0.0 # Nadal służy do thresholdingu i wyboru ścieżki
 
     while current_station_id != target_station_id:
         current_pos = station_pos_map[current_station_id]
@@ -470,12 +743,12 @@ def get_wl_by_regression_v_pro(
         # 1. Identify the direct neighbor in the direction of the target
         direct_neighbor_pos = current_pos + direction
         if not (0 <= direct_neighbor_pos < len(all_stations_list)):
-            return np.nan, np.nan, "No path available (river boundary reached)"
+            return np.nan, np.nan, np.nan, "No path available (river boundary reached)"
         direct_neighbor_id = all_stations_list[direct_neighbor_pos].id
 
         direct_reg = find_regression(current_station_id, direct_neighbor_id, regressions_df)
         if not direct_reg:
-            return np.nan, np.nan, f"No regression found for neighbor: {current_station_id}-{direct_neighbor_id}"
+            return np.nan, np.nan, np.nan, f"No regression found for neighbor: {current_station_id}-{direct_neighbor_id}"
 
         # 2. Decision: Go direct or seek a detour
         if direct_reg['rmse'] < single_rmse_thres:
@@ -530,23 +803,34 @@ def get_wl_by_regression_v_pro(
 
             # Select the best option from all available (lowest RMSE)
             best_move = min(detour_options, key=lambda x: x['reg']['rmse'])
-
-        # 3. Apply the selected move (best_move)
         move_reg = best_move['reg']
         move_start_id = best_move['start_id']
         move_target_id = best_move['target_id']
 
-        # Calculate new WSE
+        # Obliczenie nowego WSE I NIEPEWNOŚCI za pomocą ODR-P.U.
         wse_for_calc = wse_at_station[move_start_id]
-        new_wse = _apply_regression(wse_for_calc, move_start_id, move_reg)
+        u_for_calc = u_at_station[move_start_id]  # POBRANIE WCZEŚNIEJ PROPAGOWANEJ NIEPEWNOŚCI
 
-        # Update total RMSE
-        total_rmse += move_reg['rmse']
-        if total_rmse > total_rmse_thres:
-            return np.nan, np.nan, "Exceeded total RMSE threshold"
+        # Użycie nowej funkcji ODR-P.U.:
+        new_wse, new_u = propagate_wse_and_uncertainty(
+            known_wse=wse_for_calc,
+            known_u=u_for_calc,
+            reg_row=move_reg,
+            known_id=move_start_id
+        )
 
-        # Update loop state
+        if np.isnan(new_wse):
+            return np.nan, np.nan, np.nan, f"Błąd propagacji ODR: t=0 lub błąd matematyczny."
+
+        # Aktualizacja total_odr_rmse (tylko do filtrowania ścieżki)
+        total_odr_rmse += move_reg['rmse']
+        if total_odr_rmse > total_rmse_thres:
+            return np.nan, np.nan, np.nan, "Przekroczono całkowity próg RMSE ODR"
+
+        # Aktualizacja stanu pętli
         wse_at_station[move_target_id] = new_wse
+        u_at_station[move_target_id] = new_u  # ZAPIS NOWEJ PROPAGOWANEJ NIEPEWNOŚCI
+        current_station_id = move_target_id
 
         # Path update depends on the move type
         if best_move['type'] == 'backward_jump':
@@ -559,35 +843,29 @@ def get_wl_by_regression_v_pro(
             path.append(move_target_id)
             current_station_id = move_target_id
 
-    # 4. Finalization and result return
+    # 4. Zakończenie i zwrot wyników
     final_wse = wse_at_station[target_station_id]
+    final_u = u_at_station[target_station_id]  # ZWROT FINALNEJ NIEPEWNOŚCI
     path_string = '->'.join(map(str, path))
 
-    return final_wse, total_rmse, path_string
+    return final_wse, final_u, total_odr_rmse, path_string
 
 
 def calculate_path_for_row(row, target_station_id, regressions_df, all_stations_list, single_rmse_thres,
                            total_rmse_thres):
     """
-    An adapter function for use with pandas.DataFrame.apply().
-    It extracts row-specific values and calls the main computational function
-    to find the optimal regression path and WSE propagation for a single measurement.
-
-    :param row: A single measurement row from the juxtaposed time series.
-    :param target_station_id: ID of the target station (RS).
-    :param regressions_df: DataFrame of regression parameters.
-    :param all_stations_list: Ordered list of all stations.
-    :param single_rmse_thres: Threshold for a single regression RMSE.
-    :param total_rmse_thres: Threshold for the cumulative path RMSE.
-    :returns: The tuple (final_wse, total_rmse, path_string) from get_wl_by_regression_v_pro.
+    Funkcja-adapter do użycia z pandas.DataFrame.apply().
+    Teraz przekazuje WSE i niepewność (U) początkową.
     """
-    # Extract row-specific values
+    # Wyodrębnij wartości specyficzne dla wiersza
     start_wse = row['vs_wl']
+    start_u = row['uncertainty']  # NOWY POBIERANY ARGUMENT
     start_station_id = row['id_vs']
 
-    # Call the main function with the full set of arguments
+    # Wywołaj główną funkcję z pełnym zestawem argumentów
     return get_wl_by_regression_v_pro(
         start_wse=start_wse,
+        start_u=start_u,  # NOWY ARGUMENT
         start_station_id=start_station_id,
         target_station_id=target_station_id,
         regressions_df=regressions_df,
@@ -653,3 +931,10 @@ def filter_outliers_by_tstudent_test(df, window_days=3, min_periods=3, confidenc
         #  # Example of a valuable image tag
 
     return df.loc[(-df['Is_Outlier'])]
+
+
+def reindex_series_to_daily(ts):
+    start_date = ts.index.min()
+    end_date = ts.index.max()
+    full_date_range = pd.date_range(start=start_date, end=end_date, freq='D')
+    return ts.reindex(full_date_range)
