@@ -56,7 +56,7 @@ All essential user input and method parameters are centralized in two key files:
 
 1.  **SWORD Data:** You must download the required river geometry files from the **SWORD database** (Altenau et al., 2021). The path to the downloaded file (specific for a given area) must be defined in `model/data_mapping.py`.
 2.  **River Extent:** The start and end reach IDs of the river section to be analyzed can be defined by examining the reaches either visually in a GIS environment or by clicking on the relevant reach on the Dahiti map (`dahiti.dgfi.tum.de/en`).
-3.  **RiverSP Data (Optional):** If you intend to use RiverSP data, the necessary mapping files (linking different SWORD versions) must be placed inside the `data/SWORD_v17b_rename/` folder. **[LINK]**
+3.  **RiverSP Data (Optional):** If you intend to use RiverSP data, the necessary mapping files (linking different SWORD versions) must be placed inside the `data/SWORD_v17b_rename/` folder. It can be downloaded from the SWORD Explorer website (https://www.swordexplorer.com/, Download --> SWORD v16 to SWORD v17b Translation).
 
 ### 3. Execution
 
