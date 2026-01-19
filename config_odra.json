@@ -1,0 +1,31 @@
+{
+    "river_name": "Oder",
+    "validate_with_gauge": true,
+    "target_rs_id": null,
+    "river_metadata": {
+        "river": "Oder, River",
+        "insitu_query_name": "Odra",
+        "up_reach": 24222700041,
+        "dn_reach": 24221000081,
+        "country": "poland",
+        "metrical_crs": "2180",
+        "vs_with_neight_dams": [41867, 23411],
+        "sword_river_file": "/Users/michalhalicki/Documents/nauka/dane_gis/SWORD_v17b_shp/EU/eu_sword_reaches_hb24_v17b.shp",
+        "river_tributary_reaches": [24222100011],
+        "gauge_dist_threshold": 5
+    },
+    "model_configs": {
+        "amp_thres": 1,
+        "rmse_thres": 10,
+        "single_rmse_thres": 0.2,
+        "itpd_method": "akima",
+        "buffer": 300,
+        "corr_thres": 0.75,
+        "bottom": 0.1
+    },
+    "temporal_range": {
+        "t1": "2023-07-11 00:00",
+        "t2": "2025-10-01 00:00"
+    },
+    "dahiti_collections": [57]
+}

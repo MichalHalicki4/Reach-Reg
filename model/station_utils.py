@@ -10,7 +10,6 @@ import geopandas as gpd
 import matplotlib.pyplot as plt
 import numpy as np
 import copy
-from .data_mapping import dahiti_in_situ_collections
 
 
 def get_optimum_lag(ts1, ts2, n):
@@ -87,21 +86,27 @@ def get_chainages_for_all_gauges(curr_gauges, river):
     return curr_gauges
 
 
-def get_list_of_stations_from_country(country, insitu):
+def get_list_of_stations_from_config(cfg, insitu):
     """
-    Retrieves a list of all available in-situ stations (from DAHITI's collections)
-    for a specified country/region.
+    Retrieves a list of all available in-situ stations from DAHITI's collections
+    based on the IDs provided in the configuration object.
 
-    :param country: Identifier for the country/region (used to access a global dict
-                    'dahiti_in_situ_collections').
+    :param cfg: ReachRegConfig object containing the 'dahiti_collections' list.
     :param insitu: Client object for the in-situ data provider (DAHITI).
     :returns: A flattened list of all station metadata objects/dictionaries.
     """
     stations_data = []
-    for insitu_id in dahiti_in_situ_collections[country]:
-        curr_stations = insitu.list_collection(insitu_id)
-        for station in curr_stations:
-            stations_data.append(station)
+
+    # We no longer look up by country name in a global dict.
+    # The cfg object already holds the correct list of IDs for this specific run.
+    for insitu_id in cfg.dahiti_collections:
+        try:
+            curr_stations = insitu.list_collection(insitu_id)
+            for station in curr_stations:
+                stations_data.append(station)
+        except Exception as e:
+            print(f"Warning: Could not retrieve DAHITI collection {insitu_id}: {e}")
+
     return stations_data
 
 

@@ -425,7 +425,7 @@ class ReferenceStation(VirtualStation):
                 vs_with_correct_coords.append(vs)
         self.upstream_adjacent_vs = vs_with_correct_coords
 
-    def is_ds_empty_or_at_edge(self):
+    def is_rs_empty_or_at_edge(self):
         """
         Checks for various conditions that would make densification impossible or unreliable:
         1. No adjacent VS after filtering.
@@ -475,6 +475,7 @@ class ReferenceStation(VirtualStation):
         (self) and a specified adjacent VS.
 
         It uses the difference in mean WSE divided by the chainage difference.
+        A floor of 0.01 m/km is applied to ensure numerical stability.
 
         :param vs_id: ID of the adjacent Virtual Station.
         :returns: The mean slope in meters per kilometer (m/km), rounded to 3 decimal places.
@@ -482,8 +483,16 @@ class ReferenceStation(VirtualStation):
         curr_vs = [x for x in self.upstream_adjacent_vs if x.id == vs_id][0]
         curr_vs_wl, curr_vs_chain = curr_vs.wl['wse'].mean(), curr_vs.chainage
         ds_wl = self.wl['wse'].mean()
-        chain_diff = abs(self.chainage - curr_vs_chain) / 1000
-        return round(abs(curr_vs_wl - ds_wl) / chain_diff, 3)
+
+        chain_diff = abs(self.chainage - curr_vs_chain) / 1000  # convert to km
+
+        # Calculate raw slope
+        raw_slope = abs(curr_vs_wl - ds_wl) / chain_diff
+
+        # Apply 1 cm/km floor (0.01 m/km) for computational stability
+        stable_slope = max(raw_slope, 0.01)
+
+        return round(stable_slope, 3)
 
     def get_mean_slopes_dict(self):
         """
