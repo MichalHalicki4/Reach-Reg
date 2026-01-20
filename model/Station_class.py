@@ -43,7 +43,7 @@ class GaugeStation:
         self.wl_df = wl_df
         self.wl_df = self.wl_df.set_index(pd.to_datetime(self.wl_df['date']))
         self.wl_df = self.wl_df.sort_index()
-        if self.sampling in ['hourly', 'h', '15-minute', '10-minute']:
+        if self.sampling in ['hourly', 'h', '15-minute', '10-minute', '1-minute']:
             resample_str = 'h'
         else:
             resample_str = 'D'

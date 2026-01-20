@@ -16,12 +16,12 @@
         "gauge_dist_threshold": 5
     },
     "model_configs": {
-        "amp_thres": 10,
+        "amp_thres": 1,
         "rmse_thres": 10,
         "single_rmse_thres": 0.2,
         "itpd_method": "linear",
         "buffer": 300,
-        "corr_thres": -0.25,
+        "corr_thres": 0.5,
         "bottom": 0.1
     },
     "temporal_range": {
