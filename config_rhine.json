@@ -1,12 +1,12 @@
 {
-    "river_name": "Elbe",
+    "river_name": "Rhine",
     "river_metadata": {
-        "river": "Elbe, River",
-        "up_reach": 23285000251,
-        "dn_reach": 23281000101,
+        "river": "Rhine, River",
+        "up_reach": 23267000091,
+        "dn_reach": 23261000151,
         "country": "germany",
         "metrical_crs": "4839",
-        "vs_with_neight_dams": [38476],
+        "vs_with_neight_dams": [],
         "sword_river_file": "/Users/michalhalicki/Documents/nauka/dane_gis/SWORD_v17b_shp/EU/eu_sword_reaches_hb23_v17b.shp",
         "river_tributary_reaches": [],
         "gauge_dist_threshold": 5

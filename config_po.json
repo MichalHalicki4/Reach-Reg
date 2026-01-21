@@ -1,0 +1,24 @@
+{
+    "river_name": "Po",
+    "river_metadata": {
+        "river": "Po, River",
+        "up_reach": 21406901046,
+        "dn_reach": 21406100345,
+        "country": "italy",
+        "metrical_crs": "3035",
+        "vs_with_neight_dams": [46234],
+        "sword_river_file": "/Users/michalhalicki/Documents/nauka/dane_gis/SWORD_v17b_shp/EU/eu_sword_reaches_hb21_v17b.shp",
+        "river_tributary_reaches": [],
+        "gauge_dist_threshold": 5
+    },
+    "model_configs": {
+        "amp_thres": 1,
+        "corr_thres": 0.75,
+        "itpd_method": "akima"
+    },
+    "temporal_range": {
+        "t1": "2023-01-01 00:00",
+        "t2": "2026-01-01 00:00"
+    },
+    "validate_with_gauge": false
+}

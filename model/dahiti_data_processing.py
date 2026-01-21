@@ -3,6 +3,8 @@ import pickle
 import os
 from dahitiapi.DAHITI import DAHITI
 from model.Station_class import VirtualStation
+import geopandas as gpd
+from shapely.geometry import Point
 
 
 def prepare_vs_stations_for_river(cfg, riv_obj, t1, t2, res_dir, loaded_gauges={}):
@@ -36,11 +38,12 @@ def prepare_vs_stations_for_river(cfg, riv_obj, t1, t2, res_dir, loaded_gauges={
 
     vs_objects = []
     # Get velocity from config if available, otherwise default for juxtaposition
-    vel = getattr(cfg, 'velocity', 1.5)
+    vel = getattr(cfg, 'velocity', 1)
 
     for vs_set in data:
         vs_id, vs_x, vs_y = vs_set['dahiti_id'], vs_set['longitude'], vs_set['latitude']
         vs = VirtualStation(vs_id, vs_x, vs_y)
+        vs.get_sword_reach(riv_obj.gdf)
 
         # Spatial filter: 5km buffer from river center line
         if vs.is_away_from_river(riv_obj, 5000):

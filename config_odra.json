@@ -1,6 +1,6 @@
 {
     "river_name": "Oder",
-    "validate_with_gauge": true,
+    "validate_with_gauge": false,
     "target_rs_id": null,
     "river_metadata": {
         "river": "Oder, River",

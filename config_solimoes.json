@@ -1,0 +1,24 @@
+{
+    "river_name": "Solimões",
+    "river_metadata": {
+        "river": "Solimões, River",
+        "up_reach": 62293900141,
+        "dn_reach": 62293100061,
+        "country": "Brazil",
+        "metrical_crs": "ESRI:102033",
+        "vs_with_neight_dams": [],
+        "sword_river_file": "/Users/michalhalicki/Documents/nauka/dane_gis/SWORD_v17b_shp/SA/sa_sword_reaches_hb62_v17b.shp",
+        "river_tributary_reaches": [],
+        "gauge_dist_threshold": 20
+    },
+    "model_configs": {
+        "amp_thres": 1,
+        "corr_thres": 0.75,
+        "itpd_method": "akima"
+    },
+    "temporal_range": {
+        "t1": "2023-01-01 00:00",
+        "t2": "2026-01-01 00:00"
+    },
+    "validate_with_gauge": false
+}

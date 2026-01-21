@@ -54,7 +54,7 @@ class VirtualStation:
     def __init__(self, vs_id, x, y):
         self.id = vs_id
         self.x, self.y = float(x), float(y)
-        self.river, self.chainage = None, None
+        self.river, self.chainage, self.sword_reach = None, None, None
         self.wl, self.swot_wl, self.geoid, self.swot_mmxo_rbias, self.slope_correction = None, None, None, None, None
         self.neigh_g_up, self.neigh_g_up_chain, self.neigh_g_dn, self.neigh_g_dn_chain = None, None, None, None
         self.closest_gauge = None
@@ -116,6 +116,57 @@ class VirtualStation:
             self.swot_wl = pd.DataFrame(columns=self.wl.columns)
         self.wl['datetime'] = pd.to_datetime(self.wl['datetime'])
         self.wl = self.wl.set_index(self.wl['datetime'])
+
+    def get_sword_reach(self, river_gdf):
+        """
+        Finds and assigns the nearest SWORD reach to the Virtual Station using
+        a localized metric projection to ensure geographical accuracy.
+
+        Parameters:
+        -----------
+        river_gdf : geopandas.GeoDataFrame
+            A GeoDataFrame containing the reach geometries for the specific river.
+            Expected CRS: EPSG:4326.
+
+        Returns:
+        --------
+        None
+            Updates self.sword_reach with a pandas.Series representing the closest reach.
+        """
+        # 1. Spatial Subset for robustness
+        buffer_deg = 0.2
+        bbox = [self.x - buffer_deg, self.y - buffer_deg, self.x + buffer_deg, self.y + buffer_deg]
+        subset_gdf = river_gdf.cx[bbox[0]:bbox[2], bbox[1]:bbox[3]].copy()
+
+        if subset_gdf.empty:
+            subset_gdf = river_gdf.copy()
+
+        # 2. Dynamic Metric Projection (centered on station)
+        custom_crs = f"+proj=aeqd +lat_0={self.y} +lon_0={self.x} +datum=WGS84 +units=m +no_defs"
+
+        point_gdf = gpd.GeoDataFrame(
+            [{'geometry': Point(self.x, self.y)}],
+            crs="EPSG:4326"
+        ).to_crs(custom_crs)
+
+        subset_metric = subset_gdf.to_crs(custom_crs)
+
+        # 3. Distance Calculation
+        nearest = gpd.sjoin_nearest(
+            subset_metric,
+            point_gdf,
+            how='inner',
+            distance_col='dist_m'
+        )
+
+        # 4. Assignment as a Series
+        if not nearest.empty:
+            # Sort by distance and take the index of the first (closest) match
+            closest_idx = nearest.sort_values(by='dist_m').index[0]
+            # We assign as a Series to allow easy attribute access: self.sword_reach['attr_name']
+            self.sword_reach = river_gdf.loc[closest_idx]
+        else:
+            self.sword_reach = None
 
     def time_filter(self, t1, t2):
         """

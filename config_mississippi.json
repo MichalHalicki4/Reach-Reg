@@ -1,0 +1,24 @@
+{
+    "river_name": "Mississippi",
+    "river_metadata": {
+        "river": "Mississippi, River",
+        "up_reach": 74270900041,
+        "dn_reach": 74270100011,
+        "country": "United States of America",
+        "metrical_crs": "ESRI:102010",
+        "vs_with_neight_dams": [22863, 36574, 46325, 36617, 46317],
+        "sword_river_file": "/Users/michalhalicki/Documents/nauka/dane_gis/SWORD_v17b_shp/NA/na_sword_reaches_hb74_v17b.shp",
+        "river_tributary_reaches": [],
+        "gauge_dist_threshold": 10
+    },
+    "model_configs": {
+        "amp_thres": 1,
+        "corr_thres": 0.75,
+        "itpd_method": "akima"
+    },
+    "temporal_range": {
+        "t1": "2023-01-01 00:00",
+        "t2": "2026-01-01 00:00"
+    },
+    "validate_with_gauge": false
+}

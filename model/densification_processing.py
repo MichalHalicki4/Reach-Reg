@@ -89,19 +89,23 @@ def densify_wl_no_gdata(vs_id, cfg, riv_object, loaded_stations, dir_rs, dir_ts)
     # Paths using cfg.river_name
     res_path_pkl = f"{dir_rs}{cfg.river_name}_RS{rs.id}_no_gdata.pkl"
     res_path_csv = f"{dir_ts}{cfg.river_name}_RS{rs.id}.csv"
-    metadata_path = f"{dir_ts}{cfg.river_name}_metadata.csv"
+    metadata_path = f"{dir_ts}{cfg.river_name}_metadata_no_gdata.csv"
+    lstm_metadata_path = f"{dir_ts}{cfg.river_name}_lstm_metadata_no_gdata.csv"
 
     metadata_list = [vs_id, vs.x, vs.y, round(rs.chainage / 1000, 3), cfg.river_name, rs.speed_ms, rs.c,
                      rs.v_uncrt_range,
                      len(rs.densified_ts), len(rs.densified_ts['id_vs'].unique()), round(mean_uncrt, 3),
                      round(mean_rmse_sum, 3), rmse_cval, nse_cval]
+    lstm_metadata_list = [vs_id, vs.x, vs.y, vs.sword_reach['wse'], vs.sword_reach['width'], vs.sword_reach['facc'],
+                          rs.slope]
 
     # Saving
     with open(res_path_pkl, "wb") as f:
         pickle.dump(rs, f)
     rs.densified_itpd.to_csv(res_path_csv, sep=';')
 
-    _update_metadata_file(metadata_path, metadata_list, False)
+    _update_metadata_file(metadata_path, metadata_list, 'no-gauge')
+    _update_metadata_file(lstm_metadata_path, lstm_metadata_list, 'lstm')
 
 
 def densify_wl_with_gdata(vs_id, cfg, riv_object, loaded_stations, loaded_gauges, dir_rs, dir_ts):
@@ -144,23 +148,25 @@ def densify_wl_with_gdata(vs_id, cfg, riv_object, loaded_stations, loaded_gauges
     # Paths
     res_path_pkl = f"{dir_rs}{cfg.river_name}_RS{rs.id}.pkl"
     res_path_csv = f"{dir_ts}{cfg.river_name}_RS{rs.id}.csv"
-    metadata_path = f"{dir_ts}{cfg.river_name}_metadata.csv"
-
+    metadata_path = f"{dir_ts}{cfg.river_name}_metadata_.csv"
+    lstm_metadata_path = f"{dir_ts}{cfg.river_name}_lstm_metadata.csv"
     metadata_list = [vs_id, vs.x, vs.y, round(rs.chainage / 1000, 3), cfg.river_name, round(gauge_chain / 1000, 3),
                      round(rs.speed_ms, 3), rs.c, rs.v_uncrt_range, len(rs.densified_ts),
                      len(rs.densified_ts['id_vs'].unique()), round(mean_bias, 3), round(prct_in_unct, 3),
                      round(mean_rmse_sum, 3), rmse_rr, rmse_raw, rmse_cval, rmse_daily, nse_rr, nse_raw, nse_cval,
                      nse_daily]
+    lstm_metadata_list = [vs_id, vs.x, vs.y, vs.sword_reach['wse'], vs.sword_reach['width'], vs.sword_reach['facc'],
+                          rs.slope]
 
     # Saving
     with open(res_path_pkl, "wb") as f:
         pickle.dump(rs, f)
     rs.densified_itpd.to_csv(res_path_csv, sep=';')
+    _update_metadata_file(metadata_path, metadata_list, 'gauge')
+    _update_metadata_file(lstm_metadata_path, lstm_metadata_list, 'lstm')
 
-    _update_metadata_file(metadata_path, metadata_list, True)
 
-
-def _update_metadata_file(path, data_list, with_gdata):
+def _update_metadata_file(path, data_list, dtype):
     """
     Helper function to handle CSV metadata updates.
     """
@@ -168,10 +174,12 @@ def _update_metadata_file(path, data_list, with_gdata):
         df = pd.read_csv(path, sep=';')
         df.loc[len(df)] = data_list
     else:
-        if with_gdata:
+        if dtype == 'gauge':
             cols = ['id', 'x', 'y', 'chain', 'river', 'g_chain', 'velocity', 'c', 'v_uncrt_range',
                     'num_of_all_meas', 'num_of_vs', 'mean_bias', 'prct_in_unct', 'mean_rmse_sum', 'rmse_rr',
                     'rmse_raw', 'rmse_cval', 'rmse_daily', 'nse_rr', 'nse_raw', 'nse_cval', 'nse_daily']
+        elif dtype == 'lstm':
+            cols = ['id', 'x', 'y', 'wse', 'width', 'facc', 'slope']
         else:
             cols = ['id', 'x', 'y', 'chain', 'river', 'velocity', 'c', 'v_uncrt_range', 'num_of_all_meas',
                     'num_of_vs', 'mean_uncrt', 'mean_rmse_sum', 'rmse_cval', 'nse_cval']
