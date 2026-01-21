@@ -4,6 +4,7 @@ from model.Station_class import ReferenceStation
 import pickle
 import copy
 import os
+import datetime
 
 
 def _run_core_densification(vs, riv_object, loaded_stations, cfg):
@@ -16,7 +17,7 @@ def _run_core_densification(vs, riv_object, loaded_stations, cfg):
     :param cfg: ReachRegConfig object containing all hyperparameters and metadata.
     :returns: The processed ReferenceStation object and cross-validation metrics.
     """
-
+    start = datetime.datetime.now()
     # Use cfg object for initialization
     rs = ReferenceStation(vs, cfg.buffer, cfg.itpd_method)
     rs.get_upstream_adjacent_vs(loaded_stations)
@@ -41,11 +42,14 @@ def _run_core_densification(vs, riv_object, loaded_stations, cfg):
     # 2. Densification and Hydraulic Adjustment
     rs.get_slope_of_all_vs()
     rs.get_single_vs_interpolated_ts()
+    print(f'RS before densification: {datetime.datetime.now() - start}')
     rs.get_densified_wl_by_regressions(
         rmse_thres=cfg.rmse_thres,
         single_rmse_thres=cfg.single_rmse_thres
     )
-    rs.calibrate_mannings_c()
+    print(f'RS after initial densification: {datetime.datetime.now() - start}')
+    # rs.calibrate_mannings_c()
+    rs.calibrate_mannings_c_parallel()
     rs.densified_ts = rs.calculate_shifted_time_by_simplified_mannig(rs.densified_ts, cfg.bottom)
 
     # 3. Filtering and Smoothing
@@ -63,6 +67,7 @@ def _run_core_densification(vs, riv_object, loaded_stations, cfg):
     densified_ts_cval_itpd = rs.interpolate(densified_ts_cval_daily, 'daily_wse')
 
     rmse_cval, nse_cval = rs.get_rmse_nse_values(densified_ts_cval_itpd['daily_wse'], 'CrossVal', df_true)
+    print(f'RS after densification: {start - datetime.datetime.now()}')
 
     return rs, rmse_cval, nse_cval, densified_ts_cval_daily, densified_ts_cval_itpd
 

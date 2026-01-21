@@ -3,8 +3,6 @@ import pickle
 import os
 from dahitiapi.DAHITI import DAHITI
 from model.Station_class import VirtualStation
-import geopandas as gpd
-from shapely.geometry import Point
 
 
 def prepare_vs_stations_for_river(cfg, riv_obj, t1, t2, res_dir, loaded_gauges={}):
