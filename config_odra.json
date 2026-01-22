@@ -9,9 +9,14 @@
         "dn_reach": 24221000081,
         "country": "poland",
         "metrical_crs": "2180",
-        "vs_with_neight_dams": [41867, 23411],
-        "sword_river_file": "/Users/michalhalicki/Documents/nauka/dane_gis/SWORD_v17b_shp/EU/eu_sword_reaches_hb24_v17b.shp",
-        "river_tributary_reaches": [24222100011],
+        "vs_with_neight_dams": [
+            41867,
+            23411
+        ],
+        "sword_river_file": "/home/michal.halicki/Desktop/Bekker/SWORD_rivers/SWORD_v17b_shp/EU/eu_sword_reaches_hb24_v17b.shp",
+        "river_tributary_reaches": [
+            24222100011
+        ],
         "gauge_dist_threshold": 5
     },
     "model_configs": {
@@ -27,5 +32,7 @@
         "t1": "2023-07-11 00:00",
         "t2": "2025-10-01 00:00"
     },
-    "dahiti_collections": [57]
+    "dahiti_collections": [
+        57
+    ]
 }

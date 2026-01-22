@@ -9,9 +9,10 @@
         "dn_reach": 23270900011,
         "country": "germany",
         "metrical_crs": "4839",
-        "vs_with_neight_dams": [38476],
-        "sword_river_file":
-            "/Users/michalhalicki/Documents/nauka/dane_gis/SWORD_v17b_shp/EU/eu_sword_reaches_hb23_v17b.shp",
+        "vs_with_neight_dams": [
+            38476
+        ],
+        "sword_river_file": "/home/michal.halicki/Desktop/Bekker/SWORD_rivers/SWORD_v17b_shp/EU/eu_sword_reaches_hb23_v17b.shp",
         "river_tributary_reaches": [],
         "gauge_dist_threshold": 5
     },
@@ -28,5 +29,14 @@
         "t1": "2023-07-11 00:00",
         "t2": "2025-10-01 00:00"
     },
-    "dahiti_collections": [5, 44, 46, 48, 49, 50, 51, 53]
+    "dahiti_collections": [
+        5,
+        44,
+        46,
+        48,
+        49,
+        50,
+        51,
+        53
+    ]
 }

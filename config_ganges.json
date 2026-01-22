@@ -6,8 +6,10 @@
         "dn_reach": 45243100011,
         "country": "India",
         "metrical_crs": "ESRI:102025",
-        "vs_with_neight_dams": [13062],
-        "sword_river_file": "/Users/michalhalicki/Documents/nauka/dane_gis/SWORD_v17b_shp/AS/as_sword_reaches_hb45_v17b.shp",
+        "vs_with_neight_dams": [
+            13062
+        ],
+        "sword_river_file": "/home/michal.halicki/Desktop/Bekker/SWORD_rivers/SWORD_v17b_shp/AS/as_sword_reaches_hb45_v17b.shp",
         "river_tributary_reaches": [],
         "gauge_dist_threshold": 10
     },

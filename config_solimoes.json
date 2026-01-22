@@ -1,13 +1,13 @@
 {
-    "river_name": "Solimões",
+    "river_name": "Solim\u00f5es",
     "river_metadata": {
-        "river": "Solimões, River",
+        "river": "Solim\u00f5es, River",
         "up_reach": 62293900141,
         "dn_reach": 62293100061,
         "country": "Brazil",
         "metrical_crs": "ESRI:102033",
         "vs_with_neight_dams": [],
-        "sword_river_file": "/Users/michalhalicki/Documents/nauka/dane_gis/SWORD_v17b_shp/SA/sa_sword_reaches_hb62_v17b.shp",
+        "sword_river_file": "/home/michal.halicki/Desktop/Bekker/SWORD_rivers/SWORD_v17b_shp/SA/sa_sword_reaches_hb62_v17b.shp",
         "river_tributary_reaches": [],
         "gauge_dist_threshold": 20
     },

@@ -6,8 +6,14 @@
         "dn_reach": 74270100011,
         "country": "United States of America",
         "metrical_crs": "ESRI:102010",
-        "vs_with_neight_dams": [22863, 36574, 46325, 36617, 46317],
-        "sword_river_file": "/Users/michalhalicki/Documents/nauka/dane_gis/SWORD_v17b_shp/NA/na_sword_reaches_hb74_v17b.shp",
+        "vs_with_neight_dams": [
+            22863,
+            36574,
+            46325,
+            36617,
+            46317
+        ],
+        "sword_river_file": "/home/michal.halicki/Desktop/Bekker/SWORD_rivers/SWORD_v17b_shp/NA/na_sword_reaches_hb74_v17b.shp",
         "river_tributary_reaches": [],
         "gauge_dist_threshold": 10
     },

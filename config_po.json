@@ -6,8 +6,10 @@
         "dn_reach": 21406100345,
         "country": "italy",
         "metrical_crs": "3035",
-        "vs_with_neight_dams": [46234],
-        "sword_river_file": "/Users/michalhalicki/Documents/nauka/dane_gis/SWORD_v17b_shp/EU/eu_sword_reaches_hb21_v17b.shp",
+        "vs_with_neight_dams": [
+            46234
+        ],
+        "sword_river_file": "/home/michal.halicki/Desktop/Bekker/SWORD_rivers/SWORD_v17b_shp/EU/eu_sword_reaches_hb21_v17b.shp",
         "river_tributary_reaches": [],
         "gauge_dist_threshold": 5
     },
