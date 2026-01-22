@@ -1,3 +1,4 @@
+import datetime
 import math
 import geopandas as gpd
 import matplotlib.pyplot as plt
@@ -14,6 +15,8 @@ import copy
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 import hydroeval as he
 import sklearn.svm as svm
+from concurrent.futures import ProcessPoolExecutor
+from functools import partial
 from . import station_utils as s_utils
 
 
@@ -835,45 +838,115 @@ class ReferenceStation(VirtualStation):
 
     def calibrate_mannings_c(self, bottom=0.1):
         """
-        Optimizes the Manning's roughness coefficient ('c') by iterating over a range of 'c' values,
-        applying time-shifting, and evaluating the resulting Cross-Validation (CVAL) RMSE against
-        the target station's true data.
-
-        The final 'c' value is chosen to minimize CVAL RMSE while also aiming for a
-        mean velocity close to the middle of the acceptable velocity range (within the CVAL buffer).
-
-        :param bottom: Factor for estimating the river bottom height.
-        :returns: None, but sets 'self.c' to the optimal Manning's coefficient.
+        Optimizes Manning's roughness coefficient.
         """
-        slf = copy.deepcopy(self)
-        calibration_accuracies = []
-        for c in [x / 500 for x in range(10, 51)]:
-            slf.densified_ts = slf.calculate_shifted_time_by_simplified_mannig(slf.densified_ts, bottom, c)
-            df_true = slf.swot_wl[['wse']].set_index(pd.to_datetime(slf.swot_wl['datetime'])).resample(
-                'D').mean().dropna()
-            cval_rmse = slf.get_rmse_of_cval_ts(slf.densified_ts, df_true)
-            amp_thres_final = 0.1 if cval_rmse < 0.1 else 0.2
-            wl_amplitude = slf.densified_ts['shifted_wl'].max() - slf.densified_ts[
-                'shifted_wl'].min()
-            rms_thr = wl_amplitude * amp_thres_final
-            slf.densified_ts = slf.densified_ts.loc[
-                slf.densified_ts['rmse_sum'] < rms_thr]
-            slf.densified_ts = s_utils.filter_outliers_by_tstudent_test(slf.densified_ts)
 
-            densified_ts_cval = slf.densified_ts.loc[slf.densified_ts['id_vs'] != slf.id]
-            ds_cval, ds_cval_daily, ds_cval_itpd = self.get_svr_smoothed_data(densified_ts_cval)
+        # Kopiujemy obiekt raz, aby mieć dostęp do metod, ale...
+        slf = copy.deepcopy(self)
+
+        # ...kluczowe jest zapamiętanie nienaruszonej bazy danych przed pętlą!
+        original_base_ts = slf.densified_ts.copy()
+
+        # Wyliczamy df_true raz przed pętlą (oszczędność czasu)
+        df_true = slf.swot_wl[['wse']].set_index(pd.to_datetime(slf.swot_wl['datetime'])).resample('D').mean().dropna()
+
+        calibration_accuracies = []
+
+        for c in [x / 500 for x in range(10, 51)]:
+            start = datetime.datetime.now()
+
+            # 1. ZAWSZE używamy original_base_ts jako wejścia.
+            # Dzięki temu każda iteracja c startuje z tej samej liczby punktów.
+            current_ts = slf.calculate_shifted_time_by_simplified_mannig(original_base_ts, bottom, c)
+
+            # 2. Wstępne RMSE do ustalenia progu filtracji
+            raw_rmse = slf.get_raw_rmse_fast(current_ts, df_true)
+
+            # 3. Dynamiczny próg RMSE
+            amp_thres_final = 0.1 if raw_rmse < 0.1 else 0.2
+            wl_amplitude = current_ts['shifted_wl'].max() - current_ts['shifted_wl'].min()
+            rms_thr = wl_amplitude * amp_thres_final
+
+            # 4. Filtrowanie na LOKALNEJ zmiennej
+            filtered_ts = current_ts.loc[current_ts['rmse_sum'] < rms_thr].copy()
+            filtered_ts = s_utils.filter_outliers_by_tstudent_test(filtered_ts)
+
+            # 5. Przygotowanie danych do Cross-Validation (bez stacji celowej)
+            densified_ts_cval = filtered_ts.loc[filtered_ts['id_vs'] != slf.id]
+
+            print(f'Before SVR: {datetime.datetime.now() - start}, len: {len(densified_ts_cval)}, rmse_thres: {rms_thr}')
+
+            # 6. SVR (podajemy przefiltrowany, ale świeży dla danego c zbiór)
+            # UWAGA: Metoda get_svr_smoothed_data prawdopodobnie używa self.densified_ts wewnętrznie,
+            # więc musimy ją na chwilę podmienić w slf.
+            slf.densified_ts = densified_ts_cval
+            ds_cval, ds_cval_daily, ds_cval_itpd = slf.get_svr_smoothed_data(densified_ts_cval)
+
+            print(f'After SVR: {datetime.datetime.now() - start}, c={c}')
+
+            # 7. Ewaluacja
             rmse_cval, nse_cval = slf.get_rmse_nse_values(ds_cval_itpd['daily_wse'], 'CrossVal', df_true, False)
+
+            # slf.speed_ms jest ustawiane wewnątrz calculate_shifted_time...
             calibration_accuracies.append([c, slf.speed_ms, rmse_cval])
 
+        # --- Analiza wyników (bez zmian) ---
         df_calib = pd.DataFrame(calibration_accuracies, columns=['c', 'velocity', 'rmse_cval'])
         rmse_cval, vels, c_cvals = df_calib['rmse_cval'], df_calib['velocity'], df_calib['c']
+
         min_index, min_cval = rmse_cval.idxmin(), rmse_cval.min()
         cval_range = rmse_cval[rmse_cval < min_cval + self.cval_buff]
         vels_at_cval_range = vels[cval_range.index]
+
         mean_vel = (vels_at_cval_range.max() + vels_at_cval_range.min()) / 2
         mean_vel_idx = (vels_at_cval_range - mean_vel).abs().idxmin()
+
         c_cval = c_cvals[mean_vel_idx]
-        self.c, self.v_uncrt_range = c_cval, vels_at_cval_range.max() - vels_at_cval_range.min()
+
+        # Przypisujemy wynik do GŁÓWNEGO obiektu (self), nie do kopii (slf)
+        self.c = c_cval
+        self.v_uncrt_range = vels_at_cval_range.max() - vels_at_cval_range.min()
+
+        print(f"Kalibracja zakończona. Optymalne c: {self.c}")
+
+    def calibrate_mannings_c_parallel(self, bottom=0.1):
+        start_total = datetime.datetime.now()
+
+        # Przygotowanie danych (identycznie jak wcześniej)
+        original_base_ts = self.densified_ts.copy()
+        df_true = self.swot_wl[['wse']].set_index(pd.to_datetime(self.swot_wl['datetime'])).resample(
+            'D').mean().dropna()
+        c_values = [x / 500 for x in range(10, 51)]
+
+        # Tworzymy "zamrożoną" funkcję z niezmiennymi parametrami (partial)
+        # To pozwala nam mapować tylko listę 'c'
+        worker_func = partial(s_utils.run_single_calibration_step,
+                              slf_base=self,
+                              original_base_ts=original_base_ts,
+                              bottom=bottom,
+                              df_true=df_true)
+
+        print(f"Uruchamiam kalibrację równoległą dla {len(c_values)} kroków...")
+
+        # Uruchamiamy procesy
+        # max_workers=None automatycznie użyje wszystkich dostępnych rdzeni (np. 8 lub 10 na Macu)
+        with ProcessPoolExecutor(max_workers=None) as executor:
+            results = list(executor.map(worker_func, c_values))
+
+        # Konwersja wyników do DataFrame (reszta logiki bez zmian)
+        df_calib = pd.DataFrame(results, columns=['c', 'velocity', 'rmse_cval'])
+        rmse_cval, vels, c_cvals = df_calib['rmse_cval'], df_calib['velocity'], df_calib['c']
+
+        min_index, min_cval = rmse_cval.idxmin(), rmse_cval.min()
+        cval_range = rmse_cval[rmse_cval < min_cval + self.cval_buff]
+        vels_at_cval_range = vels[cval_range.index]
+
+        mean_vel = (vels_at_cval_range.max() + vels_at_cval_range.min()) / 2
+        mean_vel_idx = (vels_at_cval_range - mean_vel).abs().idxmin()
+
+        c_cval = c_cvals[mean_vel_idx]
+        self.c = c_cval
+        print(f"Total Parallel Time: {datetime.datetime.now() - start_total}")
 
     def get_rmse_of_cval_ts(self, timeseries, val_ts):
         """
@@ -892,6 +965,15 @@ class ReferenceStation(VirtualStation):
         ds_cval, ds_cval_daily, ds_cval_itpd = self.get_svr_smoothed_data(ts_cval)
         r, n = self.get_rmse_nse_values(ds_cval_itpd['daily_wse'], '', val_ts, False)
         return r
+
+    def get_raw_rmse_fast(self, timeseries, val_ts):
+        # Wybieramy dane z sąsiednich VS
+        ts_cval = timeseries.loc[timeseries['id_vs'] != self.id]
+        # Agregujemy do dziennych średnich bez SVR
+        daily_raw = ts_cval['vs_wl'].resample('D').mean().dropna()
+        # Obliczamy RMSE surowych średnich względem SWOT (val_ts)
+        combined = pd.concat([daily_raw, val_ts], axis=1).dropna()
+        return np.sqrt(((combined.iloc[:, 0] - combined.iloc[:, 1]) ** 2).mean())
 
     def get_rmse_agg_threshold(self, df_true):
         """
@@ -1009,7 +1091,7 @@ class ReferenceStation(VirtualStation):
         x_hours = time_deltas.total_seconds() / 3600
         x_train = x_hours.values.reshape(-1, 1)
 
-        svr_rbf = svm.SVR(kernel='rbf', C=c, gamma=gamma, epsilon=epsilon)
+        svr_rbf = svm.SVR(kernel='rbf', C=c, gamma=gamma, epsilon=epsilon, cache_size=2000)
         svr_rbf.fit(x_train, wse_prop, sample_weight=weights)
 
         wse_svr = svr_rbf.predict(x_train)

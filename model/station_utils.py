@@ -943,3 +943,33 @@ def reindex_series_to_daily(ts):
     end_date = ts.index.max()
     full_date_range = pd.date_range(start=start_date, end=end_date, freq='D')
     return ts.reindex(full_date_range)
+
+
+def run_single_calibration_step(c, slf_base, original_base_ts, bottom, df_true):
+    """
+    Wykonuje pojedynczą iterację kalibracji dla podanego c.
+    To musi być funkcja samodzielna (top-level), aby multiprocessing mógł ją spakować (pickle).
+    """
+    # 1. Shift
+    current_ts = slf_base.calculate_shifted_time_by_simplified_mannig(original_base_ts, bottom, c)
+
+    # 2. Szybkie RMSE do progu (Twoja nowa funkcja)
+    raw_rmse = slf_base.get_raw_rmse_fast(current_ts, df_true)
+
+    # 3. Progi i filtracja
+    amp_thres_final = 0.1 if raw_rmse < 0.15 else 0.2
+    wl_amplitude = current_ts['shifted_wl'].max() - current_ts['shifted_wl'].min()
+    rms_thr = wl_amplitude * amp_thres_final
+
+    filtered_ts = current_ts.loc[current_ts['rmse_sum'] < rms_thr].copy()
+    filtered_ts = filter_outliers_by_tstudent_test(filtered_ts)
+
+    # 4. SVR
+    densified_ts_cval = filtered_ts.loc[filtered_ts['id_vs'] != slf_base.id]
+    ds_cval, ds_cval_daily, ds_cval_itpd = slf_base.get_svr_smoothed_data(densified_ts_cval)
+
+    # 5. Ewaluacja końcowa
+    rmse_cval, nse_cval = slf_base.get_rmse_nse_values(ds_cval_itpd['daily_wse'], 'CrossVal', df_true, False)
+
+    # Zwracamy triplet: c, prędkość, rmse
+    return [c, slf_base.speed_ms, rmse_cval]
