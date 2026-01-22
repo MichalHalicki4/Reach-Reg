@@ -926,7 +926,7 @@ class ReferenceStation(VirtualStation):
                               bottom=bottom,
                               df_true=df_true)
 
-        print(f"Uruchamiam kalibrację równoległą dla {len(c_values)} kroków...")
+#        print(f"Uruchamiam kalibrację równoległą dla {len(c_values)} kroków...")
 
         # Uruchamiamy procesy
         # max_workers=None automatycznie użyje wszystkich dostępnych rdzeni (np. 8 lub 10 na Macu)
@@ -946,7 +946,7 @@ class ReferenceStation(VirtualStation):
 
         c_cval = c_cvals[mean_vel_idx]
         self.c = c_cval
-        print(f"Total Parallel Time: {datetime.datetime.now() - start_total}")
+#        print(f"Total Parallel Time: {datetime.datetime.now() - start_total}")
 
     def get_rmse_of_cval_ts(self, timeseries, val_ts):
         """

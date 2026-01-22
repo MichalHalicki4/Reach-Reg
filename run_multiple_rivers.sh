@@ -1,0 +1,35 @@
+#!/bin/bash
+
+# Lista Twoich plików JSON
+
+rivers=(
+
+  "config_po.json"
+
+  "config_missouri.json"
+
+  "config_ganges.json"
+
+  "config_elbe.json"
+
+  "config_rhine.json"
+
+  "config_amazon.json"
+
+)
+
+
+
+for config in "${rivers[@]}"
+
+do
+
+   echo "Starting: $config"
+
+   python run.py "$config"
+
+   echo "Finished: $config"
+
+   echo "----------------------"
+
+done
