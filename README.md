@@ -97,7 +97,7 @@ The main output time series are found in `results/ts_stations/` as CSV files (`{
 ## 📚 References
 
 * **Altenau, E. H., Pavelsky, T. M., Durand, M. T., Yang, X., Frasson, R. P. de M., & Bendezu, L. (2021).** The surface water and ocean topography (SWOT) mission river database (SWORD): A global river network for satellite data products. *Water Resources Research, 57*(7). https://doi.org/10.1029/2021WR030054
-* **Halicki, M., Niedzielski, T., Schwatke, C., Scherer, D., & Dettmering, D. (2026).** Daily river water levels from multi-mission altimetry: A reach-based regression method using the unique SWOT data geometry. \[In Review\]
+* **Halicki, M., Niedzielski, T., Schwatke, C., Scherer, D., & Dettmering, D. (2026).** Daily river water levels from multi-mission altimetry: A reach-based regression method using the unique SWOT data geometry. *Journal of Hydrology 673*, 135367. https://doi.org/10.1016/j.jhydrol.2026.135367
 * **Halicki, M., Niedzielski, T., Schwatke, C., Scherer, D., & Dettmering, D. (2025).** Daily Water Surface Elevations on Rivers from Multi-Mission Satellite Altimetry, *Zenodo*, https://doi.org/10.5281/zenodo.17928117
 * **Schwatke, C., Dettmering, D., Bosch, W., & Seitz, F. (2015).** Dahiti – an innovative approach for estimating water level time series over inland waters using multi-mission satellite altimetry, *Hydrology and Earth System Sciences, 19*, 4345–4364. https://doi.org/10.5194/hess-19-4345-2015
 
@@ -113,4 +113,4 @@ In short: You are free to use, modify, and distribute the code, provided you inc
 
 If you utilize the Reach-Reg code or methodology in a publication, project, or presentation, you must cite the corresponding work:
 
-* **Halicki, M., Niedzielski, T., Schwatke, C., Scherer, D., & Dettmering, D. (2026). Daily river water levels from multi-mission altimetry: A reach-based regression method using the unique SWOT data geometry. [In Review]**
+* Halicki, M., Niedzielski, T., Schwatke, C., Scherer, D., & Dettmering, D. (2026). Daily river water levels from multi-mission altimetry: A reach-based regression method using the unique SWOT data geometry. *Journal of Hydrology 673*, 135367. https://doi.org/10.1016/j.jhydrol.2026.135367
