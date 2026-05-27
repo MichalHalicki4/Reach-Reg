@@ -18,7 +18,7 @@ scripts/analyse_clean_results.py
 *.pyc
 __pycache__/
 .ipynb_checkpoints/
-.DS_Store # dla macOS
+**/.DS_Store # dla macOS
 *.log
 venv/
 .idea/ # PyCharm

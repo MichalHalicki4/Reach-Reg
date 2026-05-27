@@ -1,0 +1,137 @@
+nohup: ignoring input
+--- Reach-Reg Processing: Mississippi, River ---
+Creating new river object for: Mississippi
+Starting creation of a simplified river for Mississippi according to the column 'order'...
+Created LineString with 8598 vertices before optional buffering.
+Finished creating simplified river. Type: <class 'shapely.geometry.linestring.LineString'>
+Final number of components: 1
+2026-01-22 06:23:52 INFO [API.py:40] API-Key (~/.netrc): 59B654E28B331DF19DFD0E252F4627EB723A281AC163AC648A82C841636131D6
+2026-01-22 06:23:52 INFO [API.py:53] Authentication successful!
+2026-01-22 06:23:52 INFO [DAHITI.py:1309] List targets ...
+2026-01-22 06:23:55 INFO [DAHITI.py:1320] 19864 target(s) found!
+2026-01-22 06:23:55 INFO [DAHITI.py:168] Download water levels DAHITI target with id 14253 ...
+2026-01-22 06:23:56 INFO [DAHITI.py:168] Download water levels DAHITI target with id 14254 ...
+2026-01-22 06:23:56 INFO [DAHITI.py:168] Download water levels DAHITI target with id 15776 ...
+2026-01-22 06:23:56 INFO [DAHITI.py:168] Download water levels DAHITI target with id 15777 ...
+2026-01-22 06:23:57 INFO [DAHITI.py:168] Download water levels DAHITI target with id 16793 ...
+2026-01-22 06:23:57 INFO [DAHITI.py:168] Download water levels DAHITI target with id 16794 ...
+2026-01-22 06:23:57 INFO [DAHITI.py:168] Download water levels DAHITI target with id 22863 ...
+2026-01-22 06:23:58 INFO [DAHITI.py:168] Download water levels DAHITI target with id 22864 ...
+2026-01-22 06:23:58 INFO [DAHITI.py:168] Download water levels DAHITI target with id 36574 ...
+2026-01-22 06:23:59 INFO [DAHITI.py:168] Download water levels DAHITI target with id 36589 ...
+2026-01-22 06:23:59 INFO [DAHITI.py:168] Download water levels DAHITI target with id 36604 ...
+2026-01-22 06:23:59 INFO [DAHITI.py:168] Download water levels DAHITI target with id 38839 ...
+2026-01-22 06:24:00 INFO [DAHITI.py:168] Download water levels DAHITI target with id 46317 ...
+2026-01-22 06:24:00 INFO [DAHITI.py:168] Download water levels DAHITI target with id 46318 ...
+2026-01-22 06:24:00 INFO [DAHITI.py:168] Download water levels DAHITI target with id 46319 ...
+2026-01-22 06:24:01 INFO [DAHITI.py:168] Download water levels DAHITI target with id 46320 ...
+2026-01-22 06:24:01 INFO [DAHITI.py:168] Download water levels DAHITI target with id 46321 ...
+2026-01-22 06:24:02 INFO [DAHITI.py:168] Download water levels DAHITI target with id 46322 ...
+2026-01-22 06:24:02 INFO [DAHITI.py:168] Download water levels DAHITI target with id 46323 ...
+2026-01-22 06:24:02 INFO [DAHITI.py:168] Download water levels DAHITI target with id 46324 ...
+2026-01-22 06:24:03 INFO [DAHITI.py:168] Download water levels DAHITI target with id 46325 ...
+RS before densification: 0:00:00.066590
+RS after initial densification: 0:00:09.170340
+Uruchamiam kalibrację równoległą dla 41 kroków...
+/home/michal.halicki/.conda/envs/reach_reg/lib/python3.10/site-packages/numpy/_core/fromnumeric.py:57: RuntimeWarning: overflow encountered in multiply
+  return bound(*args, **kwds)
+/home/michal.halicki/.conda/envs/reach_reg/lib/python3.10/site-packages/numpy/_core/fromnumeric.py:57: RuntimeWarning: overflow encountered in multiply
+  return bound(*args, **kwds)
+/home/michal.halicki/.conda/envs/reach_reg/lib/python3.10/site-packages/numpy/_core/fromnumeric.py:57: RuntimeWarning: overflow encountered in multiply
+  return bound(*args, **kwds)
+/home/michal.halicki/.conda/envs/reach_reg/lib/python3.10/site-packages/numpy/_core/fromnumeric.py:57: RuntimeWarning: overflow encountered in multiply
+  return bound(*args, **kwds)
+/home/michal.halicki/.conda/envs/reach_reg/lib/python3.10/site-packages/numpy/_core/fromnumeric.py:57: RuntimeWarning: overflow encountered in multiply
+  return bound(*args, **kwds)
+/home/michal.halicki/.conda/envs/reach_reg/lib/python3.10/site-packages/numpy/_core/fromnumeric.py:57: RuntimeWarning: overflow encountered in multiply
+  return bound(*args, **kwds)
+/home/michal.halicki/.conda/envs/reach_reg/lib/python3.10/site-packages/numpy/_core/fromnumeric.py:57: RuntimeWarning: overflow encountered in multiply
+  return bound(*args, **kwds)
+Total Parallel Time: 0:00:04.090482
+CrossVal 15776 V: 0.739m/s, RMSE: 0.1298m, NSE: 0.9969
+RS after densification: -1 day, 23:59:38.601072
+RS before densification: 0:00:00.065510
+RS after initial densification: 0:00:08.067720
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:03.800626
+CrossVal 46323 V: 1.309m/s, RMSE: 0.1367m, NSE: 0.9966
+RS after densification: -1 day, 23:59:41.749482
+RS before densification: 0:00:00.064014
+RS after initial densification: 0:00:07.180375
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:04.217361
+CrossVal 46322 V: 1.566m/s, RMSE: 0.1025m, NSE: 0.9983
+RS after densification: -1 day, 23:59:42.482139
+RS before densification: 0:00:00.062924
+RS after initial densification: 0:00:06.726074
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:04.011193
+CrossVal 46321 V: 1.688m/s, RMSE: 0.0852m, NSE: 0.9989
+RS after densification: -1 day, 23:59:43.453101
+RS before densification: 0:00:00.064399
+RS after initial densification: 0:00:05.945068
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:04.072691
+CrossVal 15777 V: 1.423m/s, RMSE: 0.0967m, NSE: 0.9988
+RS after densification: -1 day, 23:59:43.016016
+RS before densification: 0:00:00.075593
+RS after initial densification: 0:00:06.952314
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:05.467515
+CrossVal 36589 V: 1.262m/s, RMSE: 0.0688m, NSE: 0.9993
+RS after densification: -1 day, 23:59:41.046108
+RS before densification: 0:00:00.064836
+RS after initial densification: 0:00:05.798725
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:04.283913
+CrossVal 46320 V: 1.342m/s, RMSE: 0.0788m, NSE: 0.9991
+RS after densification: -1 day, 23:59:43.536135
+RS before densification: 0:00:00.065273
+RS after initial densification: 0:00:05.548481
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:05.116078
+CrossVal 46319 V: 0.529m/s, RMSE: 0.0724m, NSE: 0.9993
+RS after densification: -1 day, 23:59:38.634295
+RS before densification: 0:00:00.064477
+RS after initial densification: 0:00:05.564708
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:04.330095
+CrossVal 38839 V: 0.584m/s, RMSE: 0.0823m, NSE: 0.9991
+RS after densification: -1 day, 23:59:40.476479
+RS before densification: 0:00:00.064667
+RS after initial densification: 0:00:05.855300
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:03.701254
+CrossVal 14253 V: 1.257m/s, RMSE: 0.116m, NSE: 0.9972
+RS after densification: -1 day, 23:59:43.959427
+RS before densification: 0:00:00.062809
+RS after initial densification: 0:00:06.110314
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:05.709748
+CrossVal 36604 V: 0.56m/s, RMSE: 0.0745m, NSE: 0.9992
+RS after densification: -1 day, 23:59:38.430323
+RS before densification: 0:00:00.063870
+RS after initial densification: 0:00:06.645329
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:05.459577
+CrossVal 16793 V: 0.569m/s, RMSE: 0.0906m, NSE: 0.9988
+RS after densification: -1 day, 23:59:38.115860
+RS before densification: 0:00:00.068958
+RS after initial densification: 0:00:07.408004
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:06.118246
+CrossVal 46318 V: 0.638m/s, RMSE: 0.0729m, NSE: 0.9993
+RS after densification: -1 day, 23:59:36.734164
+RS before densification: 0:00:00.127220
+RS after initial densification: 0:00:08.153730
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:04.815272
+CrossVal 14254 V: 1.092m/s, RMSE: 0.0883m, NSE: 0.9989
+RS after densification: -1 day, 23:59:39.445966
+RS before densification: 0:00:00.062247
+RS after initial densification: 0:00:09.063069
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:06.022135
+CrossVal 22864 V: 0.785m/s, RMSE: 0.0746m, NSE: 0.9993
+RS after densification: -1 day, 23:59:36.282787
+--- Processing Complete ---

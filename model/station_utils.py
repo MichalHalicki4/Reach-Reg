@@ -10,7 +10,7 @@ import geopandas as gpd
 import matplotlib.pyplot as plt
 import numpy as np
 import copy
-from .data_mapping import dahiti_in_situ_collections
+import re
 
 
 def get_optimum_lag(ts1, ts2, n):
@@ -54,6 +54,25 @@ def select_gauges_from_river(gdata_gdf, river, buff=1000):
     return gdata_gdf_metric[gdata_gdf.to_crs(river.metrical_crs).within(river_buffer_metric.iloc[0])]
 
 
+def clean_river_name(name):
+    """
+    Normalizes the river name for robust comparison.
+    Trims suffixes after '_' or ',', removes articles/stop words, and strips whitespaces.
+    """
+    if not name:
+        return ""
+
+    # 1. Truncate string at the first occurrence of '_', ',' or '-' (e.g., 'Garonne_fs' -> 'Garonne')
+    name = re.split(r'[_,\-]', name)[0]
+
+    # 2. Convert to lowercase and remove common stop words (articles, 'river' in different languages)
+    name = name.lower().strip()
+    name = re.sub(r'\b(the|la|le|river|rzeka)\b', '', name)
+
+    # 3. Strip all internal whitespaces to ensure a compact token
+    return "".join(name.split())
+
+
 def filter_gauges_by_target_name(gauges_df, insitu, riv_name):
     """
     Filters a GeoDataFrame of all gauge stations to select only those from a given river.
@@ -63,10 +82,20 @@ def filter_gauges_by_target_name(gauges_df, insitu, riv_name):
     :param riv_name: The name of the river.
     :returns: A filtered GeoDataFrame of gauge stations from a river.
     """
+    cleaned_query = clean_river_name(riv_name)
+    if not cleaned_query:
+        return gauges_df.iloc[0:0]
     valid_gauges = []
     for x in gauges_df['id'].unique():
         target_info = insitu.get_target_info(int(x))
-        if target_info['target_name'] == riv_name or target_info['target_name'] == f'{riv_name}, River':
+        target_name = target_info.get('target_name', '')
+        cleaned_target = clean_river_name(target_name)
+        # Safe substring and exact match comparison
+        if cleaned_query == cleaned_target or cleaned_query in cleaned_target:
+            # Guard rail for very short river names (e.g., "Po", "Ob", "Don")
+            # Enforces strict exact matching to prevent false positives like "Po" matching "Potomac"
+            if len(cleaned_query) <= 3 and cleaned_query != cleaned_target:
+                continue
             valid_gauges.append(x)
     return gauges_df[gauges_df['id'].isin(valid_gauges)]
 
@@ -87,21 +116,27 @@ def get_chainages_for_all_gauges(curr_gauges, river):
     return curr_gauges
 
 
-def get_list_of_stations_from_country(country, insitu):
+def get_list_of_stations_from_config(cfg, insitu):
     """
-    Retrieves a list of all available in-situ stations (from DAHITI's collections)
-    for a specified country/region.
+    Retrieves a list of all available in-situ stations from DAHITI's collections
+    based on the IDs provided in the configuration object.
 
-    :param country: Identifier for the country/region (used to access a global dict
-                    'dahiti_in_situ_collections').
+    :param cfg: ReachRegConfig object containing the 'dahiti_collections' list.
     :param insitu: Client object for the in-situ data provider (DAHITI).
     :returns: A flattened list of all station metadata objects/dictionaries.
     """
     stations_data = []
-    for insitu_id in dahiti_in_situ_collections[country]:
-        curr_stations = insitu.list_collection(insitu_id)
-        for station in curr_stations:
-            stations_data.append(station)
+
+    # We no longer look up by country name in a global dict.
+    # The cfg object already holds the correct list of IDs for this specific run.
+    for insitu_id in cfg.dahiti_collections:
+        try:
+            curr_stations = insitu.list_collection(insitu_id)
+            for station in curr_stations:
+                stations_data.append(station)
+        except Exception as e:
+            print(f"Warning: Could not retrieve DAHITI collection {insitu_id}: {e}")
+
     return stations_data
 
 
@@ -938,3 +973,33 @@ def reindex_series_to_daily(ts):
     end_date = ts.index.max()
     full_date_range = pd.date_range(start=start_date, end=end_date, freq='D')
     return ts.reindex(full_date_range)
+
+
+def run_single_calibration_step(c, slf_base, original_base_ts, bottom, df_true):
+    """
+    Wykonuje pojedynczą iterację kalibracji dla podanego c.
+    To musi być funkcja samodzielna (top-level), aby multiprocessing mógł ją spakować (pickle).
+    """
+    # 1. Shift
+    current_ts = slf_base.calculate_shifted_time_by_simplified_mannig(original_base_ts, bottom, c)
+
+    # 2. Szybkie RMSE do progu (Twoja nowa funkcja)
+    raw_rmse = slf_base.get_raw_rmse_fast(current_ts, df_true)
+
+    # 3. Progi i filtracja
+    amp_thres_final = 0.1 if raw_rmse < 0.15 else 0.2
+    wl_amplitude = current_ts['shifted_wl'].max() - current_ts['shifted_wl'].min()
+    rms_thr = wl_amplitude * amp_thres_final
+
+    filtered_ts = current_ts.loc[current_ts['rmse_sum'] < rms_thr].copy()
+    filtered_ts = filter_outliers_by_tstudent_test(filtered_ts)
+
+    # 4. SVR
+    densified_ts_cval = filtered_ts.loc[filtered_ts['id_vs'] != slf_base.id]
+    ds_cval, ds_cval_daily, ds_cval_itpd = slf_base.get_svr_smoothed_data(densified_ts_cval)
+
+    # 5. Ewaluacja końcowa
+    rmse_cval, nse_cval = slf_base.get_rmse_nse_values(ds_cval_itpd['daily_wse'], 'CrossVal', df_true, False)
+
+    # Zwracamy triplet: c, prędkość, rmse
+    return [c, slf_base.speed_ms, rmse_cval]

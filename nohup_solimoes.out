@@ -1,0 +1,263 @@
+nohup: ignoring input
+--- Reach-Reg Processing: Solimões, River ---
+Creating new river object for: Solimões
+Starting creation of a simplified river for Solimões according to the column 'order'...
+Created LineString with 9460 vertices before optional buffering.
+Finished creating simplified river. Type: <class 'shapely.geometry.linestring.LineString'>
+Final number of components: 1
+File already exists './data/vs_data/vs_at_Solimões_no_gdata.pkl'. Skipping the DAHITI downloading.
+RS before densification: 0:00:00.071217
+RS after initial densification: 0:00:17.854130
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:07.557787
+CrossVal 46640 V: 2.111m/s, RMSE: 0.119m, NSE: 0.9996
+RS after densification: -1 day, 23:59:24.139486
+RS before densification: 0:00:00.070471
+RS after initial densification: 0:00:16.477733
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:08.541574
+CrossVal 386 V: 0.715m/s, RMSE: 0.076m, NSE: 0.9998
+RS after densification: -1 day, 23:59:20.821681
+RS before densification: 0:00:00.069877
+RS after initial densification: 0:00:14.362769
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:08.195720
+CrossVal 16960 V: 0.966m/s, RMSE: 0.0591m, NSE: 0.9998
+RS after densification: -1 day, 23:59:23.514053
+RS before densification: 0:00:00.075164
+RS after initial densification: 0:00:14.348641
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:08.782182
+CrossVal 46653 V: 1.059m/s, RMSE: 0.0748m, NSE: 0.9998
+RS after densification: -1 day, 23:59:23.716349
+RS before densification: 0:00:00.073891
+RS after initial densification: 0:00:13.456852
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:07.265925
+CrossVal 17488 V: 0.73m/s, RMSE: 0.114m, NSE: 0.9996
+RS after densification: -1 day, 23:59:25.327422
+RS before densification: 0:00:00.079925
+RS after initial densification: 0:00:12.659155
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:07.141285
+CrossVal 46654 V: 0.756m/s, RMSE: 0.1662m, NSE: 0.9989
+RS after densification: -1 day, 23:59:26.483196
+RS before densification: 0:00:00.090554
+RS after initial densification: 0:00:10.485755
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:10.845381
+CrossVal 46655 V: 0.697m/s, RMSE: 0.109m, NSE: 0.9994
+RS after densification: -1 day, 23:59:23.758021
+RS before densification: 0:00:00.073163
+RS after initial densification: 0:00:10.932469
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:08.445111
+CrossVal 12163 V: 0.923m/s, RMSE: 0.0923m, NSE: 0.9996
+RS after densification: -1 day, 23:59:27.163183
+RS before densification: 0:00:00.070834
+RS after initial densification: 0:00:09.461715
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:08.518162
+CrossVal 13749 V: 0.643m/s, RMSE: 0.0746m, NSE: 0.9997
+RS after densification: -1 day, 23:59:26.986038
+RS before densification: 0:00:00.072620
+RS after initial densification: 0:00:09.585270
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:06.349669
+CrossVal 582 V: 0.825m/s, RMSE: 0.0665m, NSE: 0.9998
+RS after densification: -1 day, 23:59:30.074415
+RS before densification: 0:00:00.077158
+RS after initial densification: 0:00:09.250949
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:13.014600
+CrossVal 46637 V: 0.622m/s, RMSE: 0.077m, NSE: 0.9997
+RS after densification: -1 day, 23:59:22.398716
+RS before densification: 0:00:00.154753
+RS after initial densification: 0:00:10.375004
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:10.332307
+CrossVal 382 V: 1.288m/s, RMSE: 0.1245m, NSE: 0.9994
+RS after densification: -1 day, 23:59:26.957796
+RS before densification: 0:00:00.074970
+RS after initial densification: 0:00:09.473885
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:12.871037
+CrossVal 46982 V: 0.738m/s, RMSE: 0.0949m, NSE: 0.9997
+RS after densification: -1 day, 23:59:23.527831
+RS before densification: 0:00:00.074378
+RS after initial densification: 0:00:10.122994
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:11.417637
+CrossVal 46980 V: 0.944m/s, RMSE: 0.1333m, NSE: 0.9992
+RS after densification: -1 day, 23:59:25.126484
+RS before densification: 0:00:00.072532
+RS after initial densification: 0:00:10.524454
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:09.264422
+CrossVal 20716 V: 0.597m/s, RMSE: 0.0745m, NSE: 0.9998
+RS after densification: -1 day, 23:59:22.988620
+RS before densification: 0:00:00.071202
+RS after initial densification: 0:00:10.927417
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:14.004590
+CrossVal 380 V: 1.325m/s, RMSE: 0.1046m, NSE: 0.9995
+RS after densification: -1 day, 23:59:21.978622
+RS before densification: 0:00:00.077243
+RS after initial densification: 0:00:11.766220
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:11.860902
+CrossVal 14933 V: 0.956m/s, RMSE: 0.0907m, NSE: 0.9996
+RS after densification: -1 day, 23:59:21.119326
+RS before densification: 0:00:00.072772
+RS after initial densification: 0:00:12.614371
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:12.649057
+CrossVal 381 V: 0.843m/s, RMSE: 0.1214m, NSE: 0.9993
+RS after densification: -1 day, 23:59:19.645979
+RS before densification: 0:00:00.074412
+RS after initial densification: 0:00:13.753894
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:15.719225
+CrossVal 17913 V: 1.566m/s, RMSE: 0.0698m, NSE: 0.9996
+RS after densification: -1 day, 23:59:17.316738
+RS before densification: 0:00:00.071417
+RS after initial densification: 0:00:14.883127
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:09.702718
+CrossVal 46636 V: 0.854m/s, RMSE: 0.085m, NSE: 0.9997
+RS after densification: -1 day, 23:59:21.618182
+--- Processing Complete ---
+.halicki/.conda/envs/reach_reg/lib/python3.10/site-packages/numpy/_core/fromnumeric.py:57: RuntimeWarning: overflow encountered in multiply
+  return bound(*args, **kwds)
+/home/michal.halicki/.conda/envs/reach_reg/lib/python3.10/site-packages/numpy/_core/fromnumeric.py:57: RuntimeWarning: overflow encountered in multiply
+  return bound(*args, **kwds)
+/home/michal.halicki/.conda/envs/reach_reg/lib/python3.10/site-packages/numpy/_core/fromnumeric.py:57: RuntimeWarning: overflow encountered in multiply
+  return bound(*args, **kwds)
+/home/michal.halicki/.conda/envs/reach_reg/lib/python3.10/site-packages/numpy/_core/fromnumeric.py:57: RuntimeWarning: overflow encountered in multiply
+  return bound(*args, **kwds)
+/home/michal.halicki/.conda/envs/reach_reg/lib/python3.10/site-packages/numpy/_core/fromnumeric.py:57: RuntimeWarning: overflow encountered in multiply
+  return bound(*args, **kwds)
+/home/michal.halicki/.conda/envs/reach_reg/lib/python3.10/site-packages/numpy/_core/fromnumeric.py:57: RuntimeWarning: overflow encountered in multiply
+  return bound(*args, **kwds)
+/home/michal.halicki/.conda/envs/reach_reg/lib/python3.10/site-packages/numpy/_core/fromnumeric.py:57: RuntimeWarning: overflow encountered in multiply
+  return bound(*args, **kwds)
+/home/michal.halicki/.conda/envs/reach_reg/lib/python3.10/site-packages/numpy/_core/fromnumeric.py:57: RuntimeWarning: overflow encountered in multiply
+  return bound(*args, **kwds)
+Total Parallel Time: 0:00:07.249786
+CrossVal 46640 V: 2.111m/s, RMSE: 0.119m, NSE: 0.9996
+RS after densification: -1 day, 23:59:25.809282
+RS before densification: 0:00:00.075423
+RS after initial densification: 0:00:14.865609
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:08.607531
+CrossVal 386 V: 0.715m/s, RMSE: 0.076m, NSE: 0.9998
+RS after densification: -1 day, 23:59:20.746291
+RS before densification: 0:00:00.075208
+RS after initial densification: 0:00:13.724886
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:08.057464
+CrossVal 16960 V: 0.966m/s, RMSE: 0.0591m, NSE: 0.9998
+RS after densification: -1 day, 23:59:21.929305
+RS before densification: 0:00:00.072759
+RS after initial densification: 0:00:12.715468
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:09.391446
+CrossVal 46653 V: 1.059m/s, RMSE: 0.0747m, NSE: 0.9998
+RS after densification: -1 day, 23:59:22.481114
+RS before densification: 0:00:00.071566
+RS after initial densification: 0:00:11.700134
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:07.444392
+CrossVal 17488 V: 0.73m/s, RMSE: 0.114m, NSE: 0.9996
+RS after densification: -1 day, 23:59:23.596877
+RS before densification: 0:00:00.070788
+RS after initial densification: 0:00:11.423295
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:06.913326
+CrossVal 46654 V: 0.756m/s, RMSE: 0.1662m, NSE: 0.9989
+RS after densification: -1 day, 23:59:25.244652
+RS before densification: 0:00:00.072210
+RS after initial densification: 0:00:09.992580
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:08.692266
+CrossVal 46655 V: 0.697m/s, RMSE: 0.109m, NSE: 0.9994
+RS after densification: -1 day, 23:59:24.091848
+RS before densification: 0:00:00.075440
+RS after initial densification: 0:00:09.788616
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:10.736251
+CrossVal 12163 V: 0.923m/s, RMSE: 0.0923m, NSE: 0.9996
+RS after densification: -1 day, 23:59:25.241769
+RS before densification: 0:00:00.072262
+RS after initial densification: 0:00:09.603207
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:09.400615
+CrossVal 13749 V: 0.643m/s, RMSE: 0.0746m, NSE: 0.9997
+RS after densification: -1 day, 23:59:25.738273
+RS before densification: 0:00:00.074433
+RS after initial densification: 0:00:08.919388
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:06.799146
+CrossVal 582 V: 0.825m/s, RMSE: 0.0665m, NSE: 0.9998
+RS after densification: -1 day, 23:59:29.167450
+RS before densification: 0:00:00.075155
+RS after initial densification: 0:00:09.047294
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:09.528715
+CrossVal 46637 V: 0.622m/s, RMSE: 0.077m, NSE: 0.9997
+RS after densification: -1 day, 23:59:25.690088
+RS before densification: 0:00:00.081880
+RS after initial densification: 0:00:09.424047
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:13.145219
+CrossVal 382 V: 1.288m/s, RMSE: 0.1245m, NSE: 0.9994
+RS after densification: -1 day, 23:59:24.935179
+RS before densification: 0:00:00.070512
+RS after initial densification: 0:00:09.073538
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:12.380430
+CrossVal 46982 V: 0.738m/s, RMSE: 0.0949m, NSE: 0.9997
+RS after densification: -1 day, 23:59:23.632447
+RS before densification: 0:00:00.074533
+RS after initial densification: 0:00:11.279686
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:10.703313
+CrossVal 46980 V: 0.944m/s, RMSE: 0.1333m, NSE: 0.9992
+RS after densification: -1 day, 23:59:25.024841
+RS before densification: 0:00:00.072992
+RS after initial densification: 0:00:10.637062
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:11.396494
+CrossVal 20716 V: 0.597m/s, RMSE: 0.0745m, NSE: 0.9998
+RS after densification: -1 day, 23:59:21.400438
+RS before densification: 0:00:00.082542
+RS after initial densification: 0:00:12.800466
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:10.896542
+CrossVal 380 V: 1.325m/s, RMSE: 0.1046m, NSE: 0.9995
+RS after densification: -1 day, 23:59:23.602252
+RS before densification: 0:00:00.076185
+RS after initial densification: 0:00:13.277608
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:11.339957
+CrossVal 14933 V: 0.956m/s, RMSE: 0.0907m, NSE: 0.9996
+RS after densification: -1 day, 23:59:20.679515
+RS before densification: 0:00:00.070271
+RS after initial densification: 0:00:13.762142
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:09.914911
+CrossVal 381 V: 0.843m/s, RMSE: 0.1214m, NSE: 0.9993
+RS after densification: -1 day, 23:59:21.692770
+RS before densification: 0:00:00.076702
+RS after initial densification: 0:00:14.432613
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:11.798330
+CrossVal 17913 V: 1.566m/s, RMSE: 0.0698m, NSE: 0.9996
+RS after densification: -1 day, 23:59:20.938515
+RS before densification: 0:00:00.073706
+RS after initial densification: 0:00:15.347671
+Uruchamiam kalibrację równoległą dla 41 kroków...
+Total Parallel Time: 0:00:14.136080
+CrossVal 46636 V: 0.854m/s, RMSE: 0.085m, NSE: 0.9997
+RS after densification: -1 day, 23:59:16.804035
+--- Processing Complete ---

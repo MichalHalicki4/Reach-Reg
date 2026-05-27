@@ -1,0 +1,26 @@
+{
+    "river_name": "Elbe",
+    "river_metadata": {
+        "river": "Elbe, River",
+        "up_reach": 23285000251,
+        "dn_reach": 23281000101,
+        "country": "germany",
+        "metrical_crs": "4839",
+        "vs_with_neight_dams": [
+            38476
+        ],
+        "sword_river_file": "/home/michal.halicki/Desktop/Bekker/SWORD_rivers/SWORD_v17b_shp/EU/eu_sword_reaches_hb23_v17b.shp",
+        "river_tributary_reaches": [],
+        "gauge_dist_threshold": 5
+    },
+    "model_configs": {
+        "amp_thres": 1,
+        "corr_thres": 0.75,
+        "itpd_method": "akima"
+    },
+    "temporal_range": {
+        "t1": "2023-01-01 00:00",
+        "t2": "2026-01-01 00:00"
+    },
+    "validate_with_gauge": false
+}
