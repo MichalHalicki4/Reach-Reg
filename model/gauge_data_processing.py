@@ -243,12 +243,12 @@ def download_in_situ_data(cfg, riv_obj, t_1, dir_g_data):
     """
     Main router function for in-situ data retrieval.
     """
-    if cfg.river_name in ['Po', 'Oder', 'Rhine', 'Elbe']:
-        return download_in_situ_data_dahiti(cfg, riv_obj, t_1, dir_g_data)
-    elif cfg.river_name in ['Mississippi', 'Missouri']:
+    if cfg.river_name in ['Mississippi', 'Missouri']:
         return download_usgs_insitu_data(cfg, riv_obj, t_1, dir_g_data)
     elif cfg.river_name == 'Ganges':
         return download_ganges_insitu_data(cfg, riv_obj, t_1, dir_g_data)
     elif cfg.river_name.replace('õ', 'o') in ['Solimoes', 'Amazon']:
         return download_ana_insitu_data(cfg, riv_obj, t_1, dir_g_data)
+    else:
+        return download_in_situ_data_dahiti(cfg, riv_obj, t_1, dir_g_data)
     return None

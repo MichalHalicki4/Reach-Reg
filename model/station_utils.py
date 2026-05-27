@@ -10,6 +10,7 @@ import geopandas as gpd
 import matplotlib.pyplot as plt
 import numpy as np
 import copy
+import re
 
 
 def get_optimum_lag(ts1, ts2, n):
@@ -53,6 +54,25 @@ def select_gauges_from_river(gdata_gdf, river, buff=1000):
     return gdata_gdf_metric[gdata_gdf.to_crs(river.metrical_crs).within(river_buffer_metric.iloc[0])]
 
 
+def clean_river_name(name):
+    """
+    Normalizes the river name for robust comparison.
+    Trims suffixes after '_' or ',', removes articles/stop words, and strips whitespaces.
+    """
+    if not name:
+        return ""
+
+    # 1. Truncate string at the first occurrence of '_', ',' or '-' (e.g., 'Garonne_fs' -> 'Garonne')
+    name = re.split(r'[_,\-]', name)[0]
+
+    # 2. Convert to lowercase and remove common stop words (articles, 'river' in different languages)
+    name = name.lower().strip()
+    name = re.sub(r'\b(the|la|le|river|rzeka)\b', '', name)
+
+    # 3. Strip all internal whitespaces to ensure a compact token
+    return "".join(name.split())
+
+
 def filter_gauges_by_target_name(gauges_df, insitu, riv_name):
     """
     Filters a GeoDataFrame of all gauge stations to select only those from a given river.
@@ -62,10 +82,20 @@ def filter_gauges_by_target_name(gauges_df, insitu, riv_name):
     :param riv_name: The name of the river.
     :returns: A filtered GeoDataFrame of gauge stations from a river.
     """
+    cleaned_query = clean_river_name(riv_name)
+    if not cleaned_query:
+        return gauges_df.iloc[0:0]
     valid_gauges = []
     for x in gauges_df['id'].unique():
         target_info = insitu.get_target_info(int(x))
-        if target_info['target_name'] == riv_name or target_info['target_name'] == f'{riv_name}, River':
+        target_name = target_info.get('target_name', '')
+        cleaned_target = clean_river_name(target_name)
+        # Safe substring and exact match comparison
+        if cleaned_query == cleaned_target or cleaned_query in cleaned_target:
+            # Guard rail for very short river names (e.g., "Po", "Ob", "Don")
+            # Enforces strict exact matching to prevent false positives like "Po" matching "Potomac"
+            if len(cleaned_query) <= 3 and cleaned_query != cleaned_target:
+                continue
             valid_gauges.append(x)
     return gauges_df[gauges_df['id'].isin(valid_gauges)]
 
