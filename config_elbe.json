@@ -1,5 +1,6 @@
 {
     "river_name": "Elbe",
+    "target_rs_id": null,
     "river_metadata": {
         "river": "Elbe, River",
         "up_reach": 23285000251,
@@ -22,5 +23,6 @@
         "t1": "2023-01-01 00:00",
         "t2": "2026-01-01 00:00"
     },
-    "validate_with_gauge": false
+    "validate_with_gauge": true,
+    "data_provider": "dahiti"
 }

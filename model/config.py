@@ -46,6 +46,7 @@ class ReachRegConfig(ConfigNamespace):
         self.sword_river_file = river_meta.get('sword_river_file')
         self.river_tributary_reaches = river_meta.get('river_tributary_reaches', [])
         self.gauge_dist_threshold = river_meta.get('gauge_dist_threshold', 10)
+        self.data_provider = config_dict.get('data_provider', 'dahiti').lower()
 
         # Ensure insitu_query_name is directly accessible even if nested in JSON
         self.insitu_query_name = river_meta.get('insitu_query_name', self.river_name)

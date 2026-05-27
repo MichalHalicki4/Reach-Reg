@@ -2,11 +2,12 @@ import os
 import sys
 import json
 import pandas as pd
+import importlib
 
 from model.config import ReachRegConfig
 from model.river_utils import prepare_river_object
 from model.gauge_data_processing import download_in_situ_data
-from model.dahiti_data_processing import prepare_vs_stations_for_river
+# from model.dahiti_data_processing import prepare_vs_stations_for_river
 # from model.hydrochron_data_processing import prepare_vs_stations_for_river
 from model.densification_processing import densify_wl_with_gdata, densify_wl_no_gdata
 
@@ -39,6 +40,26 @@ def load_config(json_path):
     return cfg, temporal_range, validate, target_id
 
 
+def get_vs_processing_function(provider):
+    """
+    Dynamically imports the correct VS processing function based on data provider.
+    """
+    if provider == 'hydrocron':
+        module_name = 'model.hydrochron_data_processing'
+    elif provider == 'dahiti':
+        module_name = 'model.dahiti_data_processing'
+    else:
+        print(f"Error: Unknown data_provider '{provider}' in configuration. Use 'dahiti' or 'hydrocron'.")
+        sys.exit(1)
+
+    try:
+        module = importlib.import_module(module_name)
+        return getattr(module, 'prepare_vs_stations_for_river')
+    except (ModuleNotFoundError, AttributeError) as e:
+        print(f"Error: Could not load prepare_vs_stations_for_river from {module_name}. Details: {e}")
+        sys.exit(1)
+
+
 def densify_wl_at_river_with_gdata(cfg, t_1, t_2, dirs, target_rs_id=None):
     """
     Orchestrates the workflow using in-situ gauge station data for validation.
@@ -51,6 +72,7 @@ def densify_wl_at_river_with_gdata(cfg, t_1, t_2, dirs, target_rs_id=None):
 
     # 3. Prepare Virtual Stations (VS)
     # Added 'cfg' as first argument to match the new sterile signature
+    prepare_vs_stations_for_river = get_vs_processing_function(cfg.data_provider)
     vs_stations = prepare_vs_stations_for_river(cfg, cur_river, t_1, t_2, dirs['vs'], gauges)
 
     # 4. Run Densification for each VS
@@ -72,6 +94,7 @@ def densify_wl_at_river_no_gdata(cfg, t_1, t_2, dirs, target_rs_id=None):
 
     # 2. Prepare Virtual Stations (VS)
     # Added 'cfg' as first argument to match the new sterile signature
+    prepare_vs_stations_for_river = get_vs_processing_function(cfg.data_provider)
     vs_stations = prepare_vs_stations_for_river(cfg, cur_river, t_1, t_2, dirs['vs'])
 
     # 3. Run Densification for each VS
