@@ -4,7 +4,7 @@ import os
 from model.Station_class import VirtualStation
 
 import requests
-from tqdm.auto import tqdm
+# from tqdm.auto import tqdm
 import warnings
 import pathlib
 

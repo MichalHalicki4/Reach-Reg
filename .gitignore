@@ -1,31 +1,39 @@
+# --- Foldery z danymi i wynikami (Reach-Reg) ---
 data/g_data/*
 data/vs_data/*
 data/rivers/*
-data/external/*
-data/SWORD_v17b_rename/*
+data/external/
+data/SWORD_v17b_rename/
 results/timeseries/*
 results/rs_stations/*
 results/timeseries_outlier_tests/*
 results/rs_stations_outlier_tests/*
 figs_tabs/*
-scripts/gauge_data_downloading/*
-scripts/analyse_clean_results.py
 
+# Zachowanie struktury katalogów w Git
 !data/g_data/.gitkeep
 !data/vs_data/.gitkeep
 !data/rivers/.gitkeep
 !results/timeseries/.gitkeep
 !results/rs_stations/.gitkeep
 !figs_tabs/.gitkeep
-!scripts/gauge_data_downloading/.gitkeep
 
+# --- Skrypty i narzędzia (lokalne/tymczasowe) ---
+scripts/gauge_data_downloading/*
+!scripts/gauge_data_downloading/.gitkeep
+scripts/analyse_clean_results.py
+
+# --- Śmieci systemowe i IDE ---
+.DS_Store
+**/.DS_Store
+.idea/
 *.pyc
 __pycache__/
 .ipynb_checkpoints/
-**/.DS_Store # dla macOS
 *.log
 venv/
-.idea/ # PyCharm
+
+# --- Tymczasowe pliki edytorów i kopie zapasowe ---
 .#*
-.DS_Store
-.idea
+#*#
+*~
