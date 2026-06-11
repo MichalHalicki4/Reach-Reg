@@ -1,5 +1,6 @@
 {
     "river_name": "Missouri",
+    "target_rs_id": null,
     "river_metadata": {
         "river": "Missouri, River",
         "up_reach": 74295500011,
@@ -7,15 +8,15 @@
         "country": "United States of America",
         "metrical_crs": "ESRI:102010",
         "vs_with_neight_dams": [
-            41781,
-            15919,
-            41780,
-            16074,
-            14684
+            41781, 74295500011,
+            15919, 74295300081,
+            41780, 74295300071,
+            16074, 74295300061,
+            14684, 74295300051
         ],
-        "sword_river_file": "/home/michal.halicki/Desktop/Bekker/SWORD_rivers/SWORD_v17b_shp/NA/na_sword_reaches_hb74_v17b.shp",
+        "sword_river_file": "//Users/michalhalicki/Documents/nauka/dane_gis/SWORD_v17b_shp/NA/na_sword_reaches_hb74_v17b.shp",
         "river_tributary_reaches": [
-            74295100011
+            19677, 74295100011
         ],
         "gauge_dist_threshold": 5
     },
@@ -28,5 +29,8 @@
         "t1": "2023-01-01 00:00",
         "t2": "2026-01-01 00:00"
     },
-    "validate_with_gauge": false
+    "validate_with_gauge": true,
+    "RiverSP_version": "D",
+    "v17_translator_dir": "/Users/michalhalicki/Desktop/sword_v17b_rename_backup/AF_ReachIDs_v17b_vs_v16.csv",
+    "data_provider": "hydrocron"
 }
