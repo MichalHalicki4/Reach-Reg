@@ -1,8 +1,12 @@
 data/g_data/*
 data/vs_data/*
 data/rivers/*
+data/external/*
+data/SWORD_v17b_rename/*
 results/timeseries/*
 results/rs_stations/*
+results/timeseries_outlier_tests/*
+results/rs_stations_outlier_tests/*
 figs_tabs/*
 scripts/gauge_data_downloading/*
 scripts/analyse_clean_results.py
@@ -22,3 +26,6 @@ __pycache__/
 *.log
 venv/
 .idea/ # PyCharm
+.#*
+.DS_Store
+.idea
