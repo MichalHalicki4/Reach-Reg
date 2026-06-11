@@ -7,13 +7,13 @@
         "country": "United States of America",
         "metrical_crs": "ESRI:102010",
         "vs_with_neight_dams": [
-            22863,
-            36574,
-            46325,
-            36617,
-            46317
+            22863, 74270100031,
+            36574, 74270100021,
+            46325,74270100011,
+            36617, 74270900071,
+            46317, 74270900041
         ],
-        "sword_river_file": "/home/michal.halicki/Desktop/Bekker/SWORD_rivers/SWORD_v17b_shp/NA/na_sword_reaches_hb74_v17b.shp",
+        "sword_river_file": "//Users/michalhalicki/Documents/nauka/dane_gis/SWORD_v17b_shp/NA/na_sword_reaches_hb74_v17b.shp",
         "river_tributary_reaches": [],
         "gauge_dist_threshold": 10
     },
@@ -26,5 +26,8 @@
         "t1": "2023-01-01 00:00",
         "t2": "2026-01-01 00:00"
     },
-    "validate_with_gauge": false
+    "validate_with_gauge": true,
+    "RiverSP_version": "D",
+    "v17_translator_dir": "/Users/michalhalicki/Desktop/sword_v17b_rename_backup/AF_ReachIDs_v17b_vs_v16.csv",
+    "data_provider": "hydrocron"
 }

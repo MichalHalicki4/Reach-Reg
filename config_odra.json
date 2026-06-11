@@ -1,7 +1,8 @@
 {
     "river_name": "Oder",
-    "validate_with_gauge": false,
-    "target_rs_id": null,
+    "validate_with_gauge": true,
+    "target_rs_id_v1": 42305,
+    "target_rs_id_v2": 24222500021,
     "river_metadata": {
         "river": "Oder, River",
         "insitu_query_name": "Odra",
@@ -11,9 +12,11 @@
         "metrical_crs": "2180",
         "vs_with_neight_dams": [
             41867,
-            23411
+            24221000081,
+            23411,
+            24222700041
         ],
-        "sword_river_file": "/home/michal.halicki/Desktop/Bekker/SWORD_rivers/SWORD_v17b_shp/EU/eu_sword_reaches_hb24_v17b.shp",
+        "sword_river_file": "/Users/michalhalicki/Documents/nauka/dane_gis/SWORD_v17b_shp/EU/af_sword_reaches_hb24_v17b.shp",
         "river_tributary_reaches": [
             24222100011
         ],
@@ -30,9 +33,13 @@
     },
     "temporal_range": {
         "t1": "2023-07-11 00:00",
-        "t2": "2025-10-01 00:00"
+        "t2": "2026-06-01 00:00"
     },
     "dahiti_collections": [
         57
-    ]
+    ],
+    "RiverSP_version": "D",
+    "v17_translator_dir": "/Users/michalhalicki/Desktop/sword_v17b_rename_backup/AF_ReachIDs_v17b_vs_v16.csv",
+    "data_provider": "hydrocron"
+
 }

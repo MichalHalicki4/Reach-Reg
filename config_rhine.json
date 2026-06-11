@@ -2,12 +2,13 @@
     "river_name": "Rhine",
     "river_metadata": {
         "river": "Rhine, River",
+        "insitu_query_name": "Rhein",
         "up_reach": 23267000091,
         "dn_reach": 23261000151,
         "country": "germany",
         "metrical_crs": "4839",
         "vs_with_neight_dams": [],
-        "sword_river_file": "/home/michal.halicki/Desktop/Bekker/SWORD_rivers/SWORD_v17b_shp/EU/eu_sword_reaches_hb23_v17b.shp",
+        "sword_river_file": "//Users/michalhalicki/Documents/nauka/dane_gis/SWORD_v17b_shp/EU/eu_sword_reaches_hb23_v17b.shp",
         "river_tributary_reaches": [],
         "gauge_dist_threshold": 5
     },
@@ -20,5 +21,9 @@
         "t1": "2023-01-01 00:00",
         "t2": "2026-01-01 00:00"
     },
-    "validate_with_gauge": false
+    "dahiti_collections": [5, 44, 46, 48, 49, 50, 51, 53],
+    "validate_with_gauge": true,
+    "RiverSP_version": "D",
+    "v17_translator_dir": "/Users/michalhalicki/Desktop/sword_v17b_rename_backup/AF_ReachIDs_v17b_vs_v16.csv",
+    "data_provider": "hydrocron"
 }
