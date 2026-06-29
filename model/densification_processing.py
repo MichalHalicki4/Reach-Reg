@@ -161,7 +161,7 @@ def densify_wl_with_gdata(vs_id, cfg, riv_object, loaded_stations, loaded_gauges
                      round(mean_rmse_sum, 3), rmse_rr, rmse_raw, rmse_cval, rmse_daily, nse_rr, nse_raw, nse_cval,
                      nse_daily]
     lstm_metadata_list = [vs_id, vs.x, vs.y, vs.sword_reach['wse'], vs.sword_reach['width'], vs.sword_reach['facc'],
-                          rs.slope]
+                          rs.slope, rs.chainage, rs.sword_reach['reach_id']]
 
     # Saving
     with open(res_path_pkl, "wb") as f:
@@ -184,7 +184,7 @@ def _update_metadata_file(path, data_list, dtype):
                     'num_of_all_meas', 'num_of_vs', 'mean_bias', 'prct_in_unct', 'mean_rmse_sum', 'rmse_rr',
                     'rmse_raw', 'rmse_cval', 'rmse_daily', 'nse_rr', 'nse_raw', 'nse_cval', 'nse_daily']
         elif dtype == 'lstm':
-            cols = ['id', 'x', 'y', 'wse', 'width', 'facc', 'slope']
+            cols = ['id', 'x', 'y', 'wse', 'width', 'facc', 'slope', 'chainage', 'sword_reach']
         else:
             cols = ['id', 'x', 'y', 'chain', 'river', 'velocity', 'c', 'v_uncrt_range', 'num_of_all_meas',
                     'num_of_vs', 'mean_uncrt', 'mean_rmse_sum', 'rmse_cval', 'nse_cval']
