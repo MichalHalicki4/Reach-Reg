@@ -55,7 +55,8 @@ def _run_core_densification(vs, riv_object, loaded_stations, cfg):
     # 3. Filtering and Smoothing
     rms_thr = rs.get_rmse_agg_threshold(df_true)
     rs.densified_ts = rs.densified_ts.loc[rs.densified_ts['rmse_sum'] < rms_thr]
-    rs.densified_ts = s_utils.filter_outliers_by_tstudent_test(rs.densified_ts)
+    # rs.densified_ts = s_utils.filter_outliers_by_tstudent_test(rs.densified_ts)
+    rs.densified_ts = s_utils.filter_river_outliers_outlier_score_with_neigh_weights(rs.densified_ts)
     rs.densified_ts, rs.densified_daily, rs.densified_itpd = rs.get_svr_smoothed_data(rs.densified_ts)
 
     rs.add_uncertainty_column()
