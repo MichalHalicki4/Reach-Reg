@@ -138,6 +138,8 @@ def prepare_vs_stations_for_river(cfg, riv_obj, t1, t2, res_dir, loaded_gauges={
     for vs_set in vs_data_sets:
         vs_id, vs_x, vs_y = vs_set[0], vs_set[1], vs_set[2]
         vs = VirtualStation(vs_id, vs_x, vs_y)
+        vs.get_sword_reach(riv_obj.gdf)
+
 
         # Spatial filter: 5km buffer from river center line
         if vs.is_away_from_river(riv_obj, 5000):

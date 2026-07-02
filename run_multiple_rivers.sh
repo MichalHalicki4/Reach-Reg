@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source Bekker_Python/bin/activate
+
 # Lista Twoich plików JSON
 
 rivers=(
@@ -8,13 +10,17 @@ rivers=(
 
   "config_missouri.json"
 
+  "config_mississippi.json"
+
+  "config_odra.json"
+
   "config_ganges.json"
 
   "config_elbe.json"
 
   "config_rhine.json"
 
-  "config_amazon.json"
+  "config_solimoes.json"
 
 )
 
@@ -26,7 +32,7 @@ do
 
    echo "Starting: $config"
 
-   python run.py "$config"
+   python -E run.py "$config"
 
    echo "Finished: $config"
 
