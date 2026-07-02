@@ -160,10 +160,13 @@ def filter_gauges_by_dt_freq_target(gauges_metadata, min_dt, dahiti=True):
                                    # (gauges_metadata['data_sampling'] != 'daily') &
                                    (~gauges_metadata['target_name'].str.contains('see', na=False))]
     else:
-        return gauges_metadata.loc[(gauges_metadata['type'] == 'water_level') &
-                                   (pd.to_datetime(gauges_metadata['max_date']) > pd.to_datetime(min_dt))
-                                   # (pd.to_datetime(gauges_metadata['max_date']) > pd.to_datetime(max_dt))
-                                   ]
+        if 'type' in gauges_metadata.columns:
+            return gauges_metadata.loc[(gauges_metadata['type'] == 'water_level') &
+                                       (pd.to_datetime(gauges_metadata['max_date']) > pd.to_datetime(min_dt))
+                                       # (pd.to_datetime(gauges_metadata['max_date']) > pd.to_datetime(max_dt))
+                                       ]
+        else:
+            return gauges_metadata.loc[pd.to_datetime(gauges_metadata['max_date']) > pd.to_datetime(min_dt)]
 
 
 def juxtapose_gauge_to_densified_wl(gauge_meas_up, timeseries):
@@ -968,6 +971,261 @@ def filter_outliers_by_tstudent_test(df, window_days=3, min_periods=3, confidenc
     return df.loc[(-df['Is_Outlier'])]
 
 
+def merge_regr_and_itp_uncertainty(ts):
+    """
+        Combines the regression/measurement uncertainty and the interpolation
+        uncertainty to derive the final total WSE uncertainty ('wse_u').
+
+        The final uncertainty is calculated by summing the variances of the two error
+        sources:
+        1. Base Variance (regression/measurement uncertainty: 'daily_uncertainty'**2),
+           which is linearly interpolated over data gaps.
+        2. Interpolation Model Variance (from cross-validation: 'itpd_uncrt'**2).
+
+        The final WSE uncertainty ('wse_u') is the square root of the total variance
+        ('var_final'). Renames the 'daily_wse' column to 'wse' for final output.
+
+        Returns:
+            Daily interpolated DataFrame with the final output columns ['wse', 'wse_u', 'N'].
+    """
+    df = ts.copy()
+
+    df['N'] = df['N'].fillna(0).astype(int)
+    df['var_daily'] = df['daily_uncertainty'] ** 2
+    # 2. Interpolacja Liniowa Wariancji Bazowej
+    df['var_base_interp'] = df['var_daily'].interpolate(
+        method='linear',
+        limit_direction='both'
+    )
+
+    df['var_interp_model'] = df['itpd_uncrt'] ** 2
+    df['var_final'] = df['var_base_interp'] + df['var_interp_model']
+
+    df['wse_u'] = round(np.sqrt(df['var_final']), 3)
+    df = df.rename(columns={'daily_wse': 'wse'})
+    df['wse'] = round(df['wse'], 3)
+
+    return df[['wse', 'wse_u', 'N']]
+
+
+
+def _compute_adaptive_stats(df, target_series, window_days=5, min_points=5):
+    """
+    Helper function to compute adaptive local median and normal-scaled MAD.
+    Expands the time window symmetrically if fewer than min_points are found.
+    """
+    timestamps = df.index.to_numpy()
+    values = target_series.to_numpy()
+    n = len(df)
+
+    local_medians = np.empty(n)
+    local_mads = np.empty(n)
+
+    # 5 dni we float na potrzeby porównania różnic czasowych (w dniach)
+    half_window_days = window_days / 2.0
+    # Konwersja czasu na dni jako float, żeby łatwo odejmować w pętli
+    t_days = timestamps.astype('int64') / (1e9 * 60 * 60 * 24)
+
+    for i in range(n):
+        current_time = t_days[i]
+
+        # 1. Okno czasowe +/- 2.5 dnia
+        time_mask = (t_days >= current_time - half_window_days) & (t_days <= current_time + half_window_days)
+        indices = np.where(time_mask)[0]
+
+        # 2. Warunek awaryjny: jeśli za mało punktów, weź min_points najbliższych czasowo
+        if len(indices) < min_points:
+            time_deltas = np.abs(t_days - current_time)
+            indices = np.argsort(time_deltas)[:min_points]
+
+        # Wyciągamy wartości dla zaadaptowanego okna
+        window_values = values[indices]
+        # Usuwamy ewentualne NaNy (istotne przy gradientach brzegowych)
+        window_values = window_values[~np.isnan(window_values)]
+
+        if len(window_values) >= 3:
+            med = np.median(window_values)
+            local_medians[i] = med
+            # Skalowanie MAD ('normal' w scipy mnoży medianę odchyleń przez 1.4826)
+            abs_dev = np.abs(window_values - med)
+            local_mads[i] = np.median(abs_dev) * 1.4826
+        else:
+            # Skrajny przypadek brzegowy, jeśli w ogóle brakuje danych
+            local_medians[i] = values[i] if not np.isnan(values[i]) else 0
+            local_mads[i] = 0.0
+
+    return pd.Series(local_medians, index=df.index), pd.Series(local_mads, index=df.index)
+
+
+def calculate_outlier_score(df, window_days=5, min_points=5):
+    """
+    Calculates a non-dimensional Outlier Score (OS) for hydro-altimetry data.
+
+    The score combines water surface elevation magnitude (deviation from local median)
+    and river dynamics (bilateral gradient jumps) to isolate true data anomalies.
+    It uses an adaptive time-count window to handle irregular data gaps and SWOT clusters.
+
+    :param df: pandas.DataFrame with a DatetimeIndex and a 'shifted_wl' column.
+    :param window_days: Target size of the rolling time window in days.
+    :param min_points: Minimum number of points required to compute local statistics.
+    :return: pandas.Series containing the Outlier Score for each observation.
+    """
+    if len(df) == 0:
+        return pd.Series([], dtype=float)
+
+    # 1. Convert timestamp index to fractional days for physical gradient calculations
+    t_days = df.index.astype('int64') / (1e9 * 60 * 60 * 24)
+
+    # 2. Compute backward and forward hydraulic gradients (m/day) handling irregular gaps
+    wse_diff = df['shifted_wl'].diff()
+    t_diff = pd.Series(t_days, index=df.index).diff()
+
+    # Założony bezpieczny próg dolny (5 godzin wyrażone w dniach fraction: 5/24 = 0.2083)
+    t_epsilon = 12 / 24
+    t_diff = t_diff.clip(lower=t_epsilon)
+
+    g_back = wse_diff / t_diff
+    g_fwd = g_back.shift(-1)  # Forward gradient is the next point's backward gradient
+
+    # Absolute difference between bilateral gradients (detects sharp spikes/breaks)
+    delta_g = (g_fwd - g_back).abs()
+
+    # 3. Compute robust adaptive local statistics (Median and MAD) for Magnitude and Gradients
+    local_median, local_mad_mag = _compute_adaptive_stats(
+        df, df['shifted_wl'], window_days=window_days, min_points=min_points
+    )
+
+    _, local_mad_grad = _compute_adaptive_stats(
+        df, delta_g, window_days=window_days, min_points=min_points
+    )
+
+    # 4. Standardize components into non-dimensional Z-scores
+    epsilon = 1e-4  # Regularization factor to prevent division by zero
+    z_mag = (df['shifted_wl'] - local_median).abs() / (local_mad_mag + epsilon)
+    z_grad = delta_g / (local_mad_grad + epsilon)
+
+    # 5. Final Outlier Score calculation (Magnitude-driven with dampened dynamic validation)
+    outlier_score = (z_mag * (z_grad ** 0.5)).fillna(0)
+
+    return outlier_score
+
+
+def calculate_neighborhood_score(df, max_distance_days=7):
+    """
+    Computes a Neighborhood Score using a continuous triangular kernel.
+    Points closer in time contribute more to the score.
+    """
+    # Zamiana DatetimeIndex na dni jako float dla szybkiej matematyki wektorowej
+    t_days = df.index.astype('int64') / (1e9 * 60 * 60 * 24)
+    n = len(df)
+    scores = np.zeros(n)
+
+    # Dla każdego punktu liczymy sumę wag jego sąsiadów w promieniu max_distance_days
+    for i in range(n):
+        current_time = t_days[i]
+
+        # Oblicz bezwzględną odległość czasową od wszystkich innych punktów
+        deltas = np.abs(t_days - current_time)
+
+        # Maska dla punktów mieszczących się w oknie (np. +/- 7 dni)
+        in_window = deltas <= max_distance_days
+
+        # Liniowa funkcja wagowa: odległość 0 dni = waga 1.0, odległość max_distance_days = waga 0.0
+        # Odejmujemy 1 od samoreferencji (bieżący punkt ma deltę 0, więc jego waga to 1.0)
+        weights = 1.0 - (deltas[in_window] / max_distance_days)
+
+        # Suma wag w oknie (w tym wagi z gęstych przelotów typu SWOT)
+        scores[i] = np.sum(weights) - 1.0  # -1.0 usuwa wagę samego siebie
+
+    return pd.Series(scores, index=df.index)
+
+
+def filter_river_outliers_outlier_score_with_neigh_weights(df, window_days=10, min_points=10, rms_multiplier=10, rms_thres=0.95, plot_outliers=False):
+    """
+    Filters extreme multi-day and single-point operational outliers from a river reach series
+    using a Local Information Density Index (LIDI) weighted Outlier Score.
+
+    The method enhances the standard Outlier Score (OS) framework by dynamically adjusting
+    the filtering strictness based on the local data density profile. It applies an asymmetric,
+    median-centered dual-zone linear scaling function derived from a continuous triangular
+    neighborhood kernel. Points located within dense clusters (e.g., SWOT swaths) face high rygor
+    (OS amplificated up to 1.8x), whereas isolated observations situated in data gaps receive a high
+    degree of tolerance (OS attenuated down to 0.2x) to preserve physical flood wave crests.
+
+    The final transferable, adaptive threshold boundary is derived by calculating the Root
+    Mean Square (RMS) of the adjusted background noise signal, excluding the top extreme
+    percentiles defined by rms_thres to maintain strict insensitivity to large anomalies.
+
+    :param df: pandas.DataFrame with a DatetimeIndex and a 'shifted_wl' column.
+    :param window_days: Size of the adaptive rolling time window (in days) for local statistics.
+    :param min_points: Minimum number of neighboring observations required for adaptive statistics.
+    :param rms_multiplier: Scaling factor applied to the trimmed background noise level (e.g., 10).
+    :param rms_thres: Quantile cutoff threshold (0.0 to 1.0) used to isolate clean background noise.
+    :param plot_outliers: Boolean flag to render diagnostic dual-panel validation plots.
+    :return: Filtered pandas.DataFrame excluding rows classified as anomalies.
+    """
+    df = df.copy(deep=True)
+
+    # Step 1: Compute the raw multidimensional Outlier Score
+    df['Outlier_Score'] = calculate_outlier_score(df, window_days=window_days, min_points=min_points)
+
+    # Step 2: Compute the Local Information Density Index using a 7-day triangular kernel
+    df['Neighborhood_Score'] = calculate_neighborhood_score(df, max_distance_days=7)
+
+    s_min = df['Neighborhood_Score'].min()
+    s_max = df['Neighborhood_Score'].max()
+    s_med = df['Neighborhood_Score'].median()
+
+    # Step 3: Apply asymmetric dual-zone scaling with a lock anchor (1.0) at the station median
+    w_tolerance = np.where(
+        df['Neighborhood_Score'] <= s_med,
+        0.2 + (1.0 - 0.2) * ((df['Neighborhood_Score'] - s_min) / (s_med - s_min + 1e-4)),
+        1.0 + (1.8 - 1.0) * ((df['Neighborhood_Score'] - s_med) / (s_max - s_med + 1e-4))
+    )
+
+    # Step 4: Modulate the Outlier Score using the derived context-dependent tolerance weights
+    df['Adjusted_Outlier_Score'] = df['Outlier_Score'] * w_tolerance
+
+    # Step 5: Establish a transferable background noise ceiling using Trimmed RMS on adjusted scores
+    clean_os = df['Adjusted_Outlier_Score'].sort_values().iloc[:int(len(df) * rms_thres)]
+    rms_background = np.sqrt(np.mean(clean_os ** 2))
+
+    # Step 6: Calculate final adaptive threshold boundary and flag outliers
+    adaptive_threshold = rms_multiplier * rms_background
+    df['Is_Outlier'] = df['Adjusted_Outlier_Score'] > adaptive_threshold
+
+    # Step 7: Optional diagnostic visualization
+    if plot_outliers:
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(15, 10), sharex=True)
+
+        # Top Panel: Original Water Surface Elevation and flagged points
+        ax1.plot(df.index, df['shifted_wl'], label='Water Level (WSE)', alpha=0.6, marker='.', color='dodgerblue')
+        outliers = df[df['Is_Outlier']]
+        ax1.scatter(outliers.index, outliers['shifted_wl'], color='crimson', marker='x', s=70, zorder=5,
+                    label=f'Identified Outliers ({len(outliers)} pts)')
+        ax1.set_title('Water Level Series with Multidimensional Outlier Filtering')
+        ax1.set_ylabel('Water Level [m]')
+        ax1.legend(loc='upper left')
+        ax1.grid(True)
+
+        # Bottom Panel: Outlier Score signal and the global Trimmed RMS cutoff line
+        ax2.plot(df.index, df['Outlier_Score'], label='Calculated Outlier Score (OS)', color='purple', alpha=0.7)
+        ax2.axhline(y=adaptive_threshold, color='darkred', linestyle=':', linewidth=2,
+                    label=f'Adaptive Trimmed RMS Threshold ({rms_multiplier}x RMS)')
+        ax2.scatter(outliers.index, df.loc[df['Is_Outlier'], 'Outlier_Score'], color='crimson', marker='x', s=70,
+                    zorder=5)
+        ax2.set_title('Evolution of the Outlier Score and its Global Statistical Boundary')
+        ax2.set_xlabel('Date')
+        ax2.set_ylabel('Outlier Score Value')
+        ax2.legend(loc='upper left')
+        ax2.grid(True)
+
+        plt.tight_layout()
+        plt.show(block=True)
+
+    return df.loc[~df['Is_Outlier']]
+
+
 def reindex_series_to_daily(ts):
     start_date = ts.index.min()
     end_date = ts.index.max()
@@ -1003,3 +1261,79 @@ def run_single_calibration_step(c, slf_base, original_base_ts, bottom, df_true):
 
     # Zwracamy triplet: c, prędkość, rmse
     return [c, slf_base.speed_ms, rmse_cval]
+
+
+def plot_approach(ax, densified_os=pd.DataFrame(), densified_itpd_os=pd.DataFrame(), wse_col: str = 'wse',
+                        wse_u_col: str = 'wse_u', color='orange', label='OS'):
+    ax.plot(densified_itpd_os[wse_col], label=label, color=color)
+    # ax.fill_between(
+    #     densified_itpd_os.index,
+    #     densified_itpd_os[wse_col] - densified_itpd_os[wse_u_col],
+    #     densified_itpd_os[wse_col] + densified_itpd_os[wse_u_col],
+    #     color='orange',
+    #     alpha=0.2,
+    #     label='uncertainty'
+    # )
+    ax.scatter(densified_os['shifted_time'], densified_os['shifted_wl'],
+               marker='.', color=color)
+
+
+def plot_outlier_comparison(rs, ax, densified_ts_tstudent, densified_ts_os, densified_ts_os2=pd.DataFrame()):
+    """
+    Plots the original water level series and highlights outliers detected by
+    the T-Student test (purple 'x') and the Outlier Score method (orange '+').
+    Includes the in-situ gauge data as a black baseline.
+    """
+    # 1. Pobieramy pełny zbiór surowy jako nasz punkt odniesienia
+    raw_df = rs.densified_ts_raw
+
+    # 2. Identyfikujemy outliery poprzez różnicę indeksów czasowych
+    # T-Student outliers
+    tstudent_outliers_idx = raw_df.index.difference(densified_ts_tstudent.index)
+    df_tstudent_outliers = raw_df.loc[tstudent_outliers_idx]
+
+    # Outlier Score (OS) outliers
+    os_outliers_idx = raw_df.index.difference(densified_ts_os.index)
+    df_os_outliers = raw_df.loc[os_outliers_idx]
+
+    # --- Seria referencyjna in situ ---
+    if hasattr(rs, 'closest_in_situ_daily_wl') and rs.closest_in_situ_daily_wl is not None:
+        ax.plot(rs.closest_in_situ_daily_wl.index, rs.closest_in_situ_daily_wl.values,
+                label='In Situ (Gauge)', color='black', linewidth=2.5, zorder=1)
+
+    # --- Surowe dane altimetryczne (tło) ---
+    ax.scatter(raw_df.index, raw_df['shifted_wl'],
+               color='royalblue', alpha=0.4, s=20, label='Raw Altimetry (All Pts)', zorder=2)
+    ax.plot(raw_df.index, raw_df['shifted_wl'],
+            color='royalblue', alpha=0.2, linestyle='--', linewidth=1, zorder=2)
+
+    # --- Odrzucone punkty: T-Student ---
+    ax.scatter(df_tstudent_outliers.index, df_tstudent_outliers['shifted_wl'],
+               color='purple', marker='x', s=90, linewidths=2,
+               label=f'T-Student Outliers ({len(df_tstudent_outliers)} pts)', zorder=4)
+
+    # --- Odrzucone punkty: Outlier Score (OS) ---
+    # marker='P' daje wypełniony plus, marker='+' daje cienki plus. Obrót uzyskujemy przez matplotlib automatycznie,
+    # ale domyślny '+' nie wspiera rotacji w pyplot, dlatego używamy 'x' dla t-studenta, a dla OS damy '+' (co wygląda jak obrócony 'x' o 45 stopni względem siebie)
+    # Żeby uzyskać idealny krzyżyk obrócony o 45 stopni względem 'x' (czyli pionowy plus '+'), dajemy marker='+'
+    ax.scatter(df_os_outliers.index, df_os_outliers['shifted_wl'],
+               color='darkorange', marker='+', s=130, linewidths=2,
+               label=f'Outlier Score Outliers ({len(df_os_outliers)} pts)', zorder=3)
+    if len(densified_ts_os2) != 0:
+        os2_outliers_idx = raw_df.index.difference(densified_ts_os2.index)
+        df_os2_outliers = raw_df.loc[os2_outliers_idx]
+
+        ax.scatter(df_os2_outliers.index, df_os2_outliers['shifted_wl'],
+                   color='green', marker='o', alpha=0.5, s=130, linewidths=2,
+                   label=f'Outlier Score 2 Outliers ({len(df_os2_outliers)} pts)', zorder=3)
+
+    # 4. Kosmetyka wykresu
+    # ax.set_title(f"Outlier Detection Comparison for Virtual Station: {rs.id} ({rs.river})", fontsize=14,
+    #              fontweight='bold')
+    ax.set_ylabel("Water Surface Elevation (WSE) [m]", fontsize=12)
+    ax.set_xlabel("Date", fontsize=12)
+    # ax.grid(True, linestyle=':', alpha=0.6)
+    ax.legend(loc='upper left', frameon=True, facecolor='white', edgecolor='none', shadow=True)
+
+    # Opcjonalnie możesz zwrócić te ramki, jeśli chcesz zrobić statystyki (np. Venn Diagram)
+    return tstudent_outliers_idx, os_outliers_idx
