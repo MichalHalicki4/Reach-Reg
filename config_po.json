@@ -20,7 +20,7 @@
     },
     "temporal_range": {
         "t1": "2023-01-01 00:00",
-        "t2": "2026-01-01 00:00"
+        "t2": "2026-07-01 00:00"
     },
     "dahiti_collections": [29],
     "validate_with_gauge": true,
