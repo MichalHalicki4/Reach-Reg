@@ -16,7 +16,7 @@
         ],
         "sword_river_file": "//Users/michalhalicki/Documents/nauka/dane_gis/SWORD_v17b_shp/NA/na_sword_reaches_hb74_v17b.shp",
         "river_tributary_reaches": [
-            19677, 74295100011
+            74295100011
         ],
         "gauge_dist_threshold": 5
     },
