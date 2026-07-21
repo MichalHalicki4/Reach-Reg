@@ -227,6 +227,120 @@ class VirtualStation:
         self.neigh_g_up, self.neigh_g_up_chain = up_id, up_chain
         self.neigh_g_dn, self.neigh_g_dn_chain = dn_id, dn_chain
 
+    def find_optimal_gauges_by_data_length(
+            self,
+            loaded_gauges: dict,
+            initial_buffer_meters: float = 20000,
+            max_buffer_meters: float = 50000,
+            step_meters: float = 10000
+    ) -> None:
+        """
+        Finds the optimal pair of upstream and downstream in situ gauges for a Virtual Station (VS).
+
+        Instead of purely relying on spatial proximity, this method prioritizes gauges with
+        the longest data record and most recent observations within an expanding search buffer.
+        This mitigates issues with redundant/short gauge series and improves temporal overlap
+        with satellite altimetry data.
+
+        Parameters
+        ----------
+        loaded_gauges : dict
+            Dictionary of available GaugeStation objects {gauge_id: GaugeStation}.
+        initial_buffer_meters : float, optional
+            Initial search radius along river chainage in meters (default: 20000).
+        max_buffer_meters : float, optional
+            Maximum allowed search radius in meters (default: 50000).
+        step_meters : float, optional
+            Increment step to expand the buffer if no candidates are found (default: 10000).
+
+        Returns
+        -------
+        None
+            Updates instance attributes in-place:
+            - self.neigh_g_up, self.neigh_g_up_chain
+            - self.neigh_g_dn, self.neigh_g_dn_chain
+            - self.closest_gauge ('up' or 'dn')
+        """
+        if not loaded_gauges:
+            self.neigh_g_up, self.neigh_g_up_chain = None, None
+            self.neigh_g_dn, self.neigh_g_dn_chain = None, None
+            self.closest_gauge = None
+            return
+
+        # 1. Structure metadata for all available gauges
+        all_gauges = []
+        for g in loaded_gauges.values():
+            last_date = g.wl_df.index[-1] if not g.wl_df.empty else pd.NaT
+            data_points = len(g.wl_df)
+            dist = abs(g.chainage - self.chainage)
+            all_gauges.append({
+                'obj': g,
+                'id': g.id,
+                'chainage': g.chainage,
+                'last_date': last_date,
+                'data_points': data_points,
+                'dist_to_vs': dist,
+                'is_upstream': g.chainage > self.chainage
+            })
+
+        df_all = pd.DataFrame(all_gauges)
+        if df_all.empty:
+            return
+
+        # 2. Iteratively search within the expanding buffer
+        current_buffer = initial_buffer_meters
+        df_candidates = pd.DataFrame()
+
+        while current_buffer <= max_buffer_meters:
+            df_candidates = df_all[df_all['dist_to_vs'] <= current_buffer]
+            if not df_candidates.empty:
+                break
+            current_buffer += step_meters
+
+        # Fallback: if no gauges exist within max_buffer, consider all river gauges
+        if df_candidates.empty:
+            df_candidates = df_all
+
+        # Sort candidates: most recent data -> longest time series -> closest distance
+        df_sorted = df_candidates.sort_values(
+            by=['last_date', 'data_points', 'dist_to_vs'],
+            ascending=[False, False, True]
+        )
+
+        # Pick the primary gauge (highest quality candidate)
+        primary_gauge = df_sorted.iloc[0]
+        look_for_upstream = not primary_gauge['is_upstream']
+
+        # Search for the counterpart (opposite river side) - first in buffer, then full river
+        counterparts = df_sorted[df_sorted['is_upstream'] == look_for_upstream]
+
+        if not counterparts.empty:
+            secondary_gauge = counterparts.iloc[0]
+        else:
+            all_counterparts = df_all[df_all['is_upstream'] == look_for_upstream]
+            if not all_counterparts.empty:
+                secondary_gauge = all_counterparts.sort_values(
+                    by=['last_date', 'data_points', 'dist_to_vs'],
+                    ascending=[False, False, True]
+                ).iloc[0]
+            else:
+                secondary_gauge = None
+
+        # Assign Upstream / Downstream attributes
+        if primary_gauge['is_upstream']:
+            up_gauge = primary_gauge
+            dn_gauge = secondary_gauge
+            self.closest_gauge = 'up'
+        else:
+            up_gauge = secondary_gauge
+            dn_gauge = primary_gauge
+            self.closest_gauge = 'dn'
+
+        self.neigh_g_up = up_gauge['id'] if up_gauge is not None else None
+        self.neigh_g_up_chain = up_gauge['chainage'] if up_gauge is not None else None
+        self.neigh_g_dn = dn_gauge['id'] if dn_gauge is not None else None
+        self.neigh_g_dn_chain = dn_gauge['chainage'] if dn_gauge is not None else None
+
     def get_juxtaposed_vs_and_gauge_meas(self, gauge_meas_up, gauge_meas_down, gdata_sampling, velocity=None):
         """
         Compares the VS water level measurements with data from the closest upstream
@@ -256,12 +370,13 @@ class VirtualStation:
                 continue
             vs_wl, vs_dt = row[['wse', 'datetime']]
             vs_dt_prev = vs_dt - pd.to_timedelta('5 days')
-            try:
-                dist_up = abs(self.neigh_g_up_chain - self.chainage)
-                dist_dn = abs(self.neigh_g_dn_chain - self.chainage)
-                self.closest_gauge = 'up' if dist_up < dist_dn else 'dn'
-            except TypeError:
-                self.closest_gauge = 'up' if type(gauge_meas_up) == pd.DataFrame else 'dn'
+            if not self.closest_gauge:
+                try:
+                    dist_up = abs(self.neigh_g_up_chain - self.chainage)
+                    dist_dn = abs(self.neigh_g_dn_chain - self.chainage)
+                    self.closest_gauge = 'up' if dist_up < dist_dn else 'dn'
+                except TypeError:
+                    self.closest_gauge = 'up' if type(gauge_meas_up) == pd.DataFrame else 'dn'
             closest_gdata = gauge_meas_up if self.closest_gauge == 'up' else gauge_meas_down
             closest_chain = self.neigh_g_up_chain if self.closest_gauge == 'up' else self.neigh_g_dn_chain
             if gdata_sampling == 'daily' or velocity is not None or gauge_meas_down is None or gauge_meas_up is None:

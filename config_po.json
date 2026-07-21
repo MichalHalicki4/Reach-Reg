@@ -26,5 +26,5 @@
     "validate_with_gauge": true,
     "RiverSP_version": "D",
     "v17_translator_dir": "/Users/michalhalicki/Desktop/sword_v17b_rename_backup/AF_ReachIDs_v17b_vs_v16.csv",
-    "data_provider": "hydrocron"
+    "data_provider": "dahiti"
 }
