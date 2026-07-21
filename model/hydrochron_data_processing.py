@@ -4,7 +4,7 @@ import os
 from model.Station_class import VirtualStation
 
 import requests
-from tqdm.auto import tqdm
+# from tqdm.auto import tqdm
 import warnings
 import pathlib
 
@@ -138,6 +138,7 @@ def prepare_vs_stations_for_river(cfg, riv_obj, t1, t2, res_dir, loaded_gauges={
     for vs_set in vs_data_sets:
         vs_id, vs_x, vs_y = vs_set[0], vs_set[1], vs_set[2]
         vs = VirtualStation(vs_id, vs_x, vs_y)
+        vs.get_sword_reach(riv_obj.gdf)
 
         # Spatial filter: 5km buffer from river center line
         if vs.is_away_from_river(riv_obj, 5000):
@@ -146,7 +147,9 @@ def prepare_vs_stations_for_river(cfg, riv_obj, t1, t2, res_dir, loaded_gauges={
         vs.upload_chainage(riv_obj.get_chainage_of_point(vs.x, vs.y))
 
         if len(loaded_gauges.keys()) > 0:
-            vs.find_closest_gauge_and_chain(loaded_gauges)
+            # vs.find_closest_gauge_and_chain(loaded_gauges)
+            vs.find_optimal_gauges_by_data_length(loaded_gauges)
+
 
         vs.wl = vs_set[3]
         vs.swot_wl = vs_set[3]

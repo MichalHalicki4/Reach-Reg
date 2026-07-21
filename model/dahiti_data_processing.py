@@ -50,7 +50,8 @@ def prepare_vs_stations_for_river(cfg, riv_obj, t1, t2, res_dir, loaded_gauges={
         vs.upload_chainage(riv_obj.get_chainage_of_point(vs.x, vs.y))
 
         if len(loaded_gauges.keys()) > 0:
-            vs.find_closest_gauge_and_chain(loaded_gauges)
+            # vs.find_closest_gauge_and_chain(loaded_gauges)
+            vs.find_optimal_gauges_by_data_length(loaded_gauges)
 
         vs.get_water_levels(dahiti)
         vs.river = river_name
